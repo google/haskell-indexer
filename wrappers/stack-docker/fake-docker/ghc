@@ -1,0 +1,30 @@
+#!/bin/sh
+# Don't forget to mount /logs of the guest to some host dir.
+OUT=/logs
+PKG=$(basename "$(pwd)")
+
+log() {
+    echo "$1" >> $OUT/$PKG.log
+}
+
+log "========= FAKE GHC ======="
+log " == pwd: $(pwd)"
+for arg
+do
+  if [ "$arg" = "-static" ]; then
+    STATIC="true"
+  fi
+  log "$arg"
+done
+REALGHC=/opt/stackage/lts-6/ghc/lib/ghc-7.10.3/bin/ohc
+log "== Passing through.."
+log "$REALGHC $@"
+$REALGHC "$@"
+RESULT=$?
+if [ "$STATIC" = "true" ]; then
+  log "== Invoking indexer"
+  ghc_kythe_wrapper --drop_path_prefix './' --prepend_path_prefix "$PKG/" -- \
+    "$@" >> $OUT/$PKG.entries 2> $OUT/$PKG.stderr
+  [ "$?" != "0" ] && echo "$PKG had error" >> $OUT/errors
+fi
+exit $RESULT

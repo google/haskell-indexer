@@ -1,0 +1,28 @@
+name:                haskell-indexer-pipeline-ghckythe
+version:             0.1.0.0
+synopsis:            Gets GHC invocation arguments and streams Kythe entries.
+homepage:            https://github.com/google/haskell-indexer
+license:             Apache-2.0
+author:              Robin Palotai
+maintainer:          robinpalotai@google.com
+copyright:           Google Inc.
+category:            Language
+build-type:          Simple
+cabal-version:       >=1.22
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Language.Haskell.Indexer.Pipeline.GhcKythe
+  build-depends:       base >=4.8 && <4.10
+                     , bytestring
+                     , conduit
+                     , filepath
+                     , haskell-indexer-backend-core >= 0.1
+                     , haskell-indexer-backend-ghc >= 0.1
+                     , haskell-indexer-frontend-kythe >= 0.1
+                     , haskell-indexer-translate >= 0.1
+                     , kythe-schema >= 0.1
+                     , mmorph
+                     , mtl
+                     , text
+  default-language:    Haskell2010

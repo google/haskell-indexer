@@ -1,0 +1,27 @@
+name:                kythe-schema
+version:             0.1.0.0
+synopsis:            Library for emitting Kythe schema entries.
+homepage:            https://github.com/google/haskell-indexer
+license:             Apache-2.0
+author:              Robin Palotai
+maintainer:          robinpalotai@google.com
+copyright:           Google Inc.
+category:            Language
+build-type:          Simple
+cabal-version:       >=1.22
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Language.Kythe.Schema.Raw.VName
+                       Language.Kythe.Schema.Raw.Proto
+                       Language.Kythe.Schema.Raw
+                       Language.Kythe.Schema.Typed
+  build-depends:       base >=4.8 && <4.10
+                     , bytestring
+                     , data-default
+                     , kythe-proto
+                     , lens-family
+                     , proto-lens == 0.1.*
+                     , proto-lens-combinators == 0.1.*
+                     , text
+  default-language:    Haskell2010

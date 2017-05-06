@@ -1,0 +1,82 @@
+name:                haskell-indexer-backend-ghc
+version:             0.1.0.0
+synopsis:            Indexing code using GHC API.
+homepage:            https://github.com/google/haskell-indexer
+license:             Apache-2.0
+author:              Robin Palotai
+maintainer:          robinpalotai@google.com
+copyright:           Google Inc.
+category:            Language
+build-type:          Simple
+cabal-version:       >=1.22
+extra-source-files:  testdata/basic/*.hs
+                   , testdata/typelink/*.hs
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Language.Haskell.Indexer.Backend.Ghc
+                       Language.Haskell.Indexer.Backend.GhcLens
+                       Language.Haskell.Indexer.Backend.GhcArgs
+                       Language.Haskell.Indexer.Backend.GhcApiSupport
+                       Language.Haskell.Indexer.Backend.GhcEnv
+  build-depends:       base >=4.8 && <4.10
+                     , containers
+                     , filepath
+                     , ghc
+                     , ghc-paths
+                     , hashable
+                     , haskell-indexer-backend-core >= 0.1
+                     , haskell-indexer-translate >= 0.1
+                     , mtl
+                     , reflection >= 1.2
+                     , text
+                     , transformers
+                     , unix
+                     , unordered-containers
+  default-language:    Haskell2010
+
+Test-Suite basic_test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: BasicTest.hs
+  hs-source-dirs: tests
+  other-modules:       Language.Haskell.Indexer.Backend.Ghc.Test.TestShim
+                       Language.Haskell.Indexer.Backend.Ghc.Test.BasicTestBase
+                       Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
+                       Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
+  build-depends: base
+               , bytestring
+               , filepath
+               , haskell-indexer-backend-core >= 0.1
+               , haskell-indexer-backend-ghc
+               , haskell-indexer-translate >= 0.1
+               , semigroups
+               , test-framework
+               , test-framework-hunit
+               , text
+               , text-offset
+               , transformers
+               , HUnit
+
+Test-Suite typelink_test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: TypeLinkTest.hs
+  hs-source-dirs: tests
+  other-modules:       Language.Haskell.Indexer.Backend.Ghc.Test.TypeLinkTestBase
+                       Language.Haskell.Indexer.Backend.Ghc.Test.TestShim
+                       Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
+                       Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
+  build-depends: base
+               , bytestring
+               , filepath
+               , haskell-indexer-backend-core >= 0.1
+               , haskell-indexer-backend-ghc
+               , haskell-indexer-translate >= 0.1
+               , semigroups
+               , test-framework
+               , test-framework-hunit
+               , text
+               , text-offset
+               , transformers
+               , HUnit

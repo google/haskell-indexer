@@ -1,0 +1,27 @@
+resolver: lts-6.30
+
+packages:
+  - test-package
+  - everything
+
+ghc-options:
+  # https://ghc.haskell.org/trac/ghc/ticket/12147
+  # https://github.com/gibiansky/IHaskell/issues/636
+  bindings-GLFW: -opta-Wa,-mrelax-relocations=no
+  cipher-aes: -opta-Wa,-mrelax-relocations=no
+  skein: -opta-Wa,-mrelax-relocations=no
+  atomic-primops: -opta-Wa,-mrelax-relocations=no
+  bcrypt: -opta-Wa,-mrelax-relocations=no
+  cryptonite: -opta-Wa,-mrelax-relocations=no
+  direct-sqlite: -opta-Wa,-mrelax-relocations=no
+  double-conversion: -opta-Wa,-mrelax-relocations=no
+  glib: -opta-Wa,-mrelax-relocations=no
+  HsOpenSSL: -opta-Wa,-mrelax-relocations=no
+  inline-r: -opta-Wa,-mrelax-relocations=no
+  yaml: -opta-Wa,-mrelax-relocations=no
+
+docker:
+  enable: false  # Use stack --docker instead
+  image: fake-build
+  mount:
+    - "/tmp/kythe-entries:/logs"
