@@ -17,10 +17,13 @@
 OUT=/tmp/kythe-entries
 
 build_image() {
+  echo "== Initing submodules."
+  git submodule init
+  git submodule update
   echo "== Building build image with protoc."
-  #docker build -t hsidx-build .
+  docker build -t hsidx-build .
   echo "== Building ghc kythe wrapper."
-  #stack --docker build
+  stack --docker build
   WRAPPER=$(stack --docker path | grep local-install-root | cut -d: -f2 | sed 's/^\s*//')/bin/ghc_kythe_wrapper
   echo "== Wrapper built at $WRAPPER."
   pushd wrappers/stack-docker
