@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# GHC wrapper for indexing Haskell packages.
+# Note that variables OUT and REALGHC are exported outside this script.
+
+PKG=$(basename "$(pwd)")
+
+mkdir -p "${OUT}"
+log() {
+    echo "$1" >> ${OUT}/${PKG}.log
+}
+
+log "========= FAKE GHC ======="
+log " == pwd: $(pwd)"
+for arg in $@
+do
+  if [[ "${arg}" == "-static" ]]; then
+    STATIC="true"
+  fi
+  log "ARG: ${arg}"
+done
+log "== Passing through.."
+log "$REALGHC $*"
+$REALGHC "$@"
+RESULT=$?
+if [[ "$STATIC" = "true" ]]; then
+  log "== Invoking indexer"
+  ghc_kythe_wrapper \
+    --drop_path_prefix './' \
+    --prepend_path_prefix "${PKG}/" \
+    -- \
+    "$@" >> ${OUT}/${PKG}.entries 2> ${OUT}/${PKG}.stderr
+  [[ "$?" != "0" ]] && echo "${PKG} had error" >> ${OUT}/errors
+fi
+exit $RESULT
