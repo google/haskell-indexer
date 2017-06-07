@@ -6,11 +6,9 @@ This is not an official Google product.
 
 # Installation (Linux)
 
-## Install Haskell compiler & tools (GHC & Stack).
+## Stack
 
-See: https://www.haskell.org/downloads#platform
-
-If you only miss Stack, get it from here: http://docs.haskellstack.org/en/stable/README/
+Download Stack from http://docs.haskellstack.org
 
 ## Kythe
 
@@ -18,9 +16,9 @@ If you want to use the Kythe frontend, download a [Kythe
 release](https://github.com/google/kythe/releases) and unpack it.
 
 ```
-tar xzf kythe-v*.tar.gz
-rm -rf /opt/kythe
-mv kythe-v*/ /opt/kythe
+tar xzf kythe-v0.0.26.tar.gz -C /opt/
+rm -r /opt/kythe
+ln -s /opt/kythe-v0.0.26 /opt/kythe
 ```
 
 Version `v0.0.26` is verified to work with Haskell indexer.
@@ -50,7 +48,7 @@ stack build
 To index a few packages and serve the index, run:
 
 ```
-./build-stack.sh mtlparse cpu
+./build-stack.sh /tmp/logs mtlparse cpu
 ```
 
 The script temporarily replaces the system GHC with

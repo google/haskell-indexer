@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # GHC wrapper for indexing Haskell packages.
-# Note that variables OUT and REALGHC are exported outside this script.
+# Note that variables INDEXER_OUTPUT_DIR and REALGHC are set outside this script.
 
 PKG=$(basename "$(pwd)")
 
-mkdir -p "${OUT}"
+mkdir -p "${INDEXER_OUTPUT_DIR}"
 log() {
-    echo "$1" >> ${OUT}/${PKG}.log
+    echo "$1" >> ${INDEXER_OUTPUT_DIR}/${PKG}.log
 }
 
 log "========= FAKE GHC ======="
@@ -29,7 +29,7 @@ if [[ "$STATIC" = "true" ]]; then
     --drop_path_prefix './' \
     --prepend_path_prefix "${PKG}/" \
     -- \
-    "$@" >> ${OUT}/${PKG}.entries 2> ${OUT}/${PKG}.stderr
-  [[ "$?" != "0" ]] && echo "${PKG} had error" >> ${OUT}/errors
+    "$@" >> ${INDEXER_OUTPUT_DIR}/${PKG}.entries 2> ${INDEXER_OUTPUT_DIR}/${PKG}.stderr
+  [[ "$?" != "0" ]] && echo "${PKG} had error" >> ${INDEXER_OUTPUT_DIR}/errors
 fi
 exit $RESULT
