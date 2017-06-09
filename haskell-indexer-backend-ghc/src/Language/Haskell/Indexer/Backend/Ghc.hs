@@ -919,8 +919,7 @@ toTickReference
     -> TickReference
 toTickReference ctx refContext declAlts (Reference name refKind span0) =
     let tick = nameInModuleToTick ctx name
-        ident = nameOccurenceText name
-    in TickReference (replaceWithPrimary tick) ident span0
+    in TickReference (replaceWithPrimary tick) span0
                       (replaceWithPrimary <$> refContext) refKind
         where
           replaceWithPrimary = altTickToPrimary declAlts

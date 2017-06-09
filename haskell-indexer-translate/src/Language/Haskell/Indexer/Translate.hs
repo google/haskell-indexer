@@ -166,7 +166,6 @@ data StringyType = StringyType
 -- | Reference to the given tick from the given span.
 data TickReference = TickReference
     { refTargetTick       :: !Tick
-    , refTargetIdentifier :: !DisplayId
     , refSourceSpan       :: !Span
       -- ^ The precise location of the reference. Frontends probably want to
       --   make this a hyperlink on the UI.
@@ -178,7 +177,7 @@ data TickReference = TickReference
       --   for the indexer to emit it.
       --
       --   Here we pragmatically set the context to the current top-level
-      --   function, if any. On the UI, this will show up as the next element
+      --   function, if any. On the UI, this might show up as the next element
       --   in the call chain - see 'ReferenceKind'.
     , refKind             :: !ReferenceKind
     } deriving (Eq, Show)
@@ -211,7 +210,10 @@ data ReferenceKind
     | TypeDecl -- ^ Usage of identifier in type declaration, left to "::"
     deriving (Eq, Ord, Show)
 
--- | Read it aloud as 'relSourceTick' 'relKind' 'relTargetTick'.
+-- | A Relation is between standalone semantic nodes, in contrast to
+-- TickReference, which is between a source span and a semantic node.
+--
+-- Read it aloud as 'relSourceTick' 'relKind' 'relTargetTick'.
 data Relation = Relation
     { relSourceTick :: !Tick
     , relKind       :: !RelationKind
