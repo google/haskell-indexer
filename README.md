@@ -19,7 +19,7 @@ release](https://github.com/google/kythe/releases) and unpack it.
 tar xzf kythe-v0.0.26.tar.gz -C /opt/
 rm -r /opt/kythe
 ln -s /opt/kythe-v0.0.26 /opt/kythe
-chmod 755 /opt/kythe/web/ui/index.html  # It misses permission by default.
+chmod -R 755 /opt/kythe/web/ui  # It misses permission by default.
 ```
 
 Version `v0.0.26` is verified to work with Haskell indexer.
