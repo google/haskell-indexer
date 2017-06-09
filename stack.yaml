@@ -39,3 +39,5 @@ docker:
   # mentioned script which builds it.
   image: hsidx-build
 
+nix:
+  packages: [gcc, protobuf3_2]

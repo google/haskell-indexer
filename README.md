@@ -33,6 +33,9 @@ binary in the PATH.
 unzip -j protoc-*-linux-x86_64.zip bin/protoc -d /usr/local/bin/
 ```
 
+> If you use have Nix installed and you use `stack --nix`, you do not need to do
+> this.
+
 # Build the project
 
 Use the following to build and run tests:
