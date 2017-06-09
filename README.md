@@ -19,6 +19,7 @@ release](https://github.com/google/kythe/releases) and unpack it.
 tar xzf kythe-v0.0.26.tar.gz -C /opt/
 rm -r /opt/kythe
 ln -s /opt/kythe-v0.0.26 /opt/kythe
+chmod 755 /opt/kythe/web/ui/index.html  # It misses permission by default.
 ```
 
 Version `v0.0.26` is verified to work with Haskell indexer.
@@ -57,6 +58,10 @@ To index a few packages and serve the index, run:
 The script temporarily replaces the system GHC with
 `wrappers/stack-docker/fake-stack/ghc` script, does the indexing and serves the
 built index at `localhost:8080`.
+
+If you get empty index, look at `/tmp/logs/*.stderr` files about possible
+indexing errors. Also make sure that you `/tmp/logs/*.entries` files are not
+empty. If they are, there was some trouble with indexing.
 
 ## Indexing using Docker
 
