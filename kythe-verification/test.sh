@@ -34,6 +34,7 @@ for fut in \
     "$BASIC/DataRef.hs" \
     "$BASIC/FunctionArgRef.hs" \
     "$BASIC/LocalRef.hs" \
+    "$BASIC/Module.hs" \
     "$BASIC/RecordReadRef.hs" \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
