@@ -30,6 +30,7 @@ die() {
 
 for fut in \
     "$BASIC/Anchors.hs" \
+    "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
     "$BASIC/DataRef.hs" \
     "$BASIC/FunctionArgRef.hs" \
     "$BASIC/LocalRef.hs" \
@@ -37,7 +38,6 @@ for fut in \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
-    "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
     "$BASIC/TypeDef.hs"
 
 do
