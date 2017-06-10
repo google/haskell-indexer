@@ -205,7 +205,10 @@ data TickReference = TickReference
 -- argument application, the rest are reference. The frontend is free to
 -- disregard this information and treat everything as calls or references
 -- though.
-data ReferenceKind = Ref | Call
+data ReferenceKind
+    = Ref      -- ^ Reference
+    | Call     -- ^ Function call
+    | TypeDecl -- ^ Usage of identifier in type declaration, left to "::"
     deriving (Eq, Ord, Show)
 
 -- | Read it aloud as 'relSourceTick' 'relKind' 'relTargetTick'.
