@@ -14,5 +14,5 @@ extra-source-files:  ../third_party/kythe/kythe/proto/storage.proto
 library
   exposed-modules:     Proto.Kythe.Proto.Storage
   build-depends:       base >=4.8 && <4.10
-                     , proto-lens-protoc == 0.2.*
+                     , proto-lens-protoc >= 0.1
   default-language:    Haskell2010

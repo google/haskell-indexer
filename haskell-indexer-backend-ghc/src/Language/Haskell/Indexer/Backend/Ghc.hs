@@ -100,10 +100,12 @@ data ExtractCtx = ExtractCtx
 #if __GLASGOW_HASKELL__ >= 800
 showPackageName :: UnitId -> String
 showPackageName = unitIdString
+mayUnLoc = unLoc
 #elif __GLASGOW_HASKELL__ >= 710
 showPackageName :: PackageKey -> String
 showPackageName = packageKeyString
-moduleUnitId = moduleUnitId
+moduleUnitId = modulePackageKey
+mayUnLoc = id
 #endif
 
 analyseTypechecked :: GhcEnv -> AnalysisOptions -> TypecheckedModule -> XRef
@@ -202,13 +204,13 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     mkDeclName n = nameDeclAlt ctx n Nothing typeStringyType
     explicitNames = concatMap namesFromForall . universeBi $ hsGroup
     implicitVarBindDefs =
-      let allUsages = concatMap namesFromTyVar . universeBi $ hsGroup
-          firstUsages = mapMaybe keepFirst
-            . groupBy ((==) `on` fst)
-            . sortBy (comparing fst)
-            . map fromLoc
-            $ allUsages
-      in map mkDecl firstUsages
+        let allUsages = concatMap namesFromTyVar . universeBi $ hsGroup
+            firstUsages = mapMaybe keepFirst
+              . groupBy ((==) `on` fst)
+              . sortBy (comparing fst)
+              . map fromLoc
+              $ allUsages
+        in map mkDecl firstUsages
       where
         mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
         fromLoc (L l n) = (n, l)
@@ -222,7 +224,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
       where
         mkDecl binder =
-          nameDeclAlt ctx (boundTyVarName binder) Nothing typeStringyType
+          nameDeclAlt ctx (hsLTyVarName binder) Nothing typeStringyType
     namesFromForall _ = []
     -- | For typevar binders directly attached to datatype declarations (like
     -- data, type, class etc), the location of the name is correctly set to
@@ -234,13 +236,11 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
 #else
     declsFromDataBinders :: LHsTyVarBndrs Name -> [DeclAndAlt]
 #endif
-    --TODO: is this missing something
-    declsFromDataBinders = map (mkDecl . boundTyVarName . unLoc) . hsq_explicit
+    declsFromDataBinders = map (mkDecl . hsTyVarName . unLoc) . hsq_explicit
       where
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
-    -- This function exists and is called hsTyVarName in GHC 8.0
-    boundTyVarName :: HsTyVarBndr id -> id
-    boundTyVarName = \case
+    hsTyVarName :: HsTyVarBndr id -> id
+    hsTyVarName = \case
         UserTyVar n -> unLoc n
         KindedTyVar n _ -> unLoc n
     -- Datatypes.
@@ -403,7 +403,7 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         -- Basic variable at the leaves of type trees.
         -- Not only "real" type variables, but also type-level terms like
         -- specific types, type aliases etc.
-        HsTyVar n -> give ctx (nameLocToRef (unLoc n) Ref l)
+        HsTyVar n -> give ctx (nameLocToRef (mayUnLoc n) Ref l)
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
 
