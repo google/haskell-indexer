@@ -88,7 +88,7 @@ data AnalysedFile = AnalysedFile
     }
     deriving (Eq, Show)
 
--- | Info
+-- | Info required to reference a module.
 data ModuleTick = ModuleTick
     { mtPkgModule :: !PkgModule
     , mtSpan      :: !(Maybe Span)

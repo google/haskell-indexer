@@ -170,6 +170,7 @@ modifyDecl declMods decl =
     applyMod (MethodForInstance i) =
         withExtra (\e -> e {methodForInstance = Just $! i}) decl
 
+-- | Bundles up the module name with its source span.
 mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
 mkModuleTick lhsm pm = ModuleTick pm span
   where

@@ -93,6 +93,7 @@ stream a = do
 -- | Glorified pair. The entries are not exhaustive for the given VName.
 data NameAndEntries = NameAndEntries !Raw.VName ![Raw.Entry]
 
+-- | Facts for a Kythe package, which corresponds to a Haskell package+module.
 makePackageFacts :: Raw.VName -> PkgModule -> NameAndEntries
 makePackageFacts basevn PkgModule{..} = NameAndEntries pkgvn facts
   where
