@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# GHC wrapper for indexing Haskell packages.
+# GHC wrapper for indexing Haskell packages via Stack.
 # Note that variables INDEXER_OUTPUT_DIR and REALGHC are set outside this script.
 
 PKG=$(basename "$(pwd)")

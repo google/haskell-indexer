@@ -19,7 +19,7 @@ The individual protos are prefixed by a varint-encoded binary length.
 
 Example: Indexing a module.
 
-    $ ghc_wrapper -c mycorpus -P gcc -- A.hs \
+    $ ghc_kythe_wrapper -c mycorpus -P gcc -- A.hs \
           | /opt/kythe/tools/write_entries -graphstore /tmp/gs
     $ /opt/kythe/tools/http_server \
           -graphstore /tmp/gs \
@@ -72,8 +72,8 @@ main = do
   where
     opts = info (helper <*> flagParser)
         $  header (
-               "ghc_wrapper - pretends to be GHC and writes Kythe artifacts. "
-               ++ "Options after the first -- are passed on to GHC.")
+               "ghc_kythe_wrapper - pretends to be GHC and writes Kythe "
+               ++ "artifacts. Options after the first -- are passed on to GHC.")
         <> fullDesc
 
 flagParser :: Parser Flags
