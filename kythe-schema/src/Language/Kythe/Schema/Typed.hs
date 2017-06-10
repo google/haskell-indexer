@@ -53,6 +53,7 @@ import qualified Language.Kythe.Schema.Raw as Raw
 data NodeKind
     = AnchorNK
     | FileNK
+    | PackageNK
     | VariableNK
 
 -- | Renders node kind to Kythe text value.
@@ -60,6 +61,7 @@ printNodeKind :: NodeKind -> Text
 printNodeKind = \case
     AnchorNK   -> "anchor"
     FileNK     -> "file"
+    PackageNK  -> "package"
     VariableNK -> "variable"
 
 -- | Name of a node fact constrained by the accepted value type.

@@ -111,7 +111,11 @@ analyseTypechecked ghcEnv opts tm =
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
         rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
         decls = map daDecl declsAlts
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) decls refs rels
+        moduleTick = give ctx $
+            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
+                         (extractModuleName ctx (ecModule ctx))
+    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
+            decls refs rels
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
@@ -165,6 +169,12 @@ modifyDecl declMods decl =
   where
     applyMod (MethodForInstance i) =
         withExtra (\e -> e {methodForInstance = Just $! i}) decl
+
+-- | Bundles up the module name with its source span.
+mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
+mkModuleTick lhsm pm = ModuleTick pm moduleNameSpan
+  where
+    moduleNameSpan = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
@@ -919,8 +929,7 @@ toTickReference
     -> TickReference
 toTickReference ctx refContext declAlts (Reference name refKind span0) =
     let tick = nameInModuleToTick ctx name
-        ident = nameOccurenceText name
-    in TickReference (replaceWithPrimary tick) ident span0
+    in TickReference (replaceWithPrimary tick) span0
                       (replaceWithPrimary <$> refContext) refKind
         where
           replaceWithPrimary = altTickToPrimary declAlts

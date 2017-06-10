@@ -47,6 +47,7 @@ import Language.Haskell.Indexer.Translate.Utils (tickString)
 -- | Data commonly needed while converting Analysis result to Kythe.
 data ConversionEnv = ConversionEnv
     { fileVName   :: !Raw.VName
+    , pkgVName    :: !Raw.VName
     , offsets     :: !Offset.OffsetTable
     , baseVName   :: !Raw.VName
     }
@@ -56,16 +57,23 @@ type Conversion = Reader ConversionEnv
 type ConversionT = ReaderT ConversionEnv
 
 -- | Converts crossreference data of a file to Kythe schema.
+-- 'basevn' should have the corpus and language prefilled.
 toKythe :: Raw.VName -> T.Text -> XRef -> Source Identity Raw.Entry
 toKythe basevn content XRef{..} = do
-    let NameAndEntries filevn fileEntries =
+    let NameAndEntries pkgvn pkgEntries =
+            makePackageFacts basevn (mtPkgModule xrefModule)
+        NameAndEntries filevn fileEntries =
             makeFileFacts basevn
                           (analysedOriginalPath xrefFile)
                           encodedContent
-        -- TODO(robinpalotai): emit package node, put in env for decls to use.
-        env = ConversionEnv filevn table basevn
-    sourceList fileEntries
+        env = ConversionEnv filevn pkgvn table basevn
+        -- Files are children of the package they belong to.
+        pkgFileEntry = edge filevn ChildOfE pkgvn
+    sourceList (pkgFileEntry : pkgEntries ++ fileEntries)
     flip runReaderT env $ do
+        -- Note: Kythe schema doesn't do 'define/binding' on package which
+        -- makes sense generally. So we don't do so either from Haskell.
+        stream (makeAnchor (mtSpan xrefModule) RefE pkgvn Nothing Nothing)
         mapM_ (stream . makeDeclFacts) xrefDecls
         mapM_ (stream . makeUsageFacts) xrefCrossRefs
         mapM_ (stream . makeRelationFacts) xrefRelations
@@ -84,6 +92,14 @@ stream a = do
 
 -- | Glorified pair. The entries are not exhaustive for the given VName.
 data NameAndEntries = NameAndEntries !Raw.VName ![Raw.Entry]
+
+-- | Facts for a Kythe package, which corresponds to a Haskell package+module.
+makePackageFacts :: Raw.VName -> PkgModule -> NameAndEntries
+makePackageFacts basevn PkgModule{..} = NameAndEntries pkgvn facts
+  where
+    pkgvn = basevn { vnSignature = moduleSig }
+      where moduleSig = getPackage <> ":" <> getModule
+    facts = nodeFacts pkgvn PackageNK []
 
 -- | Creates file node entries. Not in Conversion, since the result is needed
 -- to construct the ConversionEnv.
@@ -121,6 +137,7 @@ makeDeclFacts decl@Decl{..} = do
     declVName <- tickVName declTick
     -- TODO(robinpalotai): use actual node type (Variable is a catch-all now).
     -- TODO(robinpalotai): emit type entries.
+    -- TODO(robinpalotai): emit Module childofness if top-level.
     let declFacts = nodeFacts declVName VariableNK
                         [ nodeFact CompleteF Definition ]
     anchorEntries <- makeAnchor (declPreferredUiSpan decl)
@@ -129,7 +146,10 @@ makeDeclFacts decl@Decl{..} = do
                          -- TODO(robinpalotai): plumb high-level context to
                          -- Decl entries too in backend.
                          Nothing
-    return (declFacts ++ anchorEntries)
+    childOfModule <- if tickUniqueInModule declTick
+        then Just . edge declVName ChildOfE <$> asks pkgVName
+        else return Nothing
+    return (declFacts ++ anchorEntries ++ maybeToList childOfModule)
 
 -- | Makes entries for an anchor (either explicit or implicit)..
 --
@@ -225,6 +245,9 @@ anchorVName sourcePath (OffsetRange s e) targetVName =
 -- | An implicit anchor doesn't have a source location, but we still need to
 -- make a unique VName for it. So we generate it from the signature of the
 -- target.
+-- TODO(robinp): this should still have the current sourcePath set.
+-- TODO(robinp): could randomize signature to make multiple implicit anchors
+--               stay distinct. Though not clear if that is useful.
 implicitAnchorVName :: Raw.VName -> Raw.VName
 implicitAnchorVName targetVName = targetVName
     { vnSignature = vnSignature targetVName <> ":ImplicitAnchor" }

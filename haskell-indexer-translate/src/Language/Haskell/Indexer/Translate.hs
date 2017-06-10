@@ -30,6 +30,7 @@ module Language.Haskell.Indexer.Translate
     --
     , XRef(..)
     , AnalysedFile(..)
+    , ModuleTick(..)
     , Decl(..)
     , DeclExtra(..), emptyExtra, withExtra
     , PkgModule(..)
@@ -68,8 +69,9 @@ spanFile (Span (Pos _ _ f) _) = f
 -- Contains lists, to give lazy evaluation a chance and results can eventually
 -- be streamed with lower peek memory residency.
 data XRef = XRef
-    { xrefFile :: !AnalysedFile
-    , xrefDecls :: [Decl]
+    { xrefFile      :: !AnalysedFile
+    , xrefModule    :: !ModuleTick
+    , xrefDecls     :: [Decl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     }
@@ -83,6 +85,16 @@ data AnalysedFile = AnalysedFile
     , analysedOriginalPath :: !SourcePath
       -- ^ A nice, abstract path, which developers think of as the location of
       --   the file. Ideally stripped of temporary workdirs.
+    }
+    deriving (Eq, Show)
+
+-- | Info required to reference a module.
+data ModuleTick = ModuleTick
+    { mtPkgModule :: !PkgModule
+    , mtSpan      :: !(Maybe Span)
+      -- ^ Span of the module name.
+      -- For example, 'X' in 'module X where'.
+      -- Main modules can have this missing.
     }
     deriving (Eq, Show)
 
@@ -101,6 +113,8 @@ data Tick = Tick
       --   tick string. Use other spans in Decl for source linking.
     , tickUniqueInModule :: !Bool
       -- ^ If true, the generated unique name can omit the span.
+      --   This usually signals top levelness too.
+      --   TODO(robinpalotai): make the distinction clear? Rename?
     , tickTermLevel :: !Bool
       -- ^ Needed to disambiguate same name occuring in term and type level.
     }
@@ -166,7 +180,6 @@ data StringyType = StringyType
 -- | Reference to the given tick from the given span.
 data TickReference = TickReference
     { refTargetTick       :: !Tick
-    , refTargetIdentifier :: !DisplayId
     , refSourceSpan       :: !Span
       -- ^ The precise location of the reference. Frontends probably want to
       --   make this a hyperlink on the UI.
@@ -178,7 +191,7 @@ data TickReference = TickReference
       --   for the indexer to emit it.
       --
       --   Here we pragmatically set the context to the current top-level
-      --   function, if any. On the UI, this will show up as the next element
+      --   function, if any. On the UI, this might show up as the next element
       --   in the call chain - see 'ReferenceKind'.
     , refKind             :: !ReferenceKind
     } deriving (Eq, Show)
@@ -211,7 +224,10 @@ data ReferenceKind
     | TypeDecl -- ^ Usage of identifier in type declaration, left to "::"
     deriving (Eq, Ord, Show)
 
--- | Read it aloud as 'relSourceTick' 'relKind' 'relTargetTick'.
+-- | A Relation is between standalone semantic nodes, in contrast to
+-- TickReference, which is between a source span and a semantic node.
+--
+-- Read it aloud as 'relSourceTick' 'relKind' 'relTargetTick'.
 data Relation = Relation
     { relSourceTick :: !Tick
     , relKind       :: !RelationKind
