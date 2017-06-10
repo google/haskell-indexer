@@ -379,7 +379,8 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         sigRefs =
           case hs_valds hsGroup of
             ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
-            _ -> []
+            ValBindsIn _ lsigs ->
+              error "should not hit ValBindsIn when accessing renamed AST"
         refContext = Nothing
     in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
