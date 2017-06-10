@@ -37,7 +37,9 @@ for fut in \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
-    "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs"
+    "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
+    "$BASIC/TypeDef.hs"
+
 do
   echo "Verifying: $fut"
   $GHC_KYTHE -- $fut 2> /dev/null | $VERIFIER -goal_prefix '-- -' $fut \
