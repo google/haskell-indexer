@@ -376,7 +376,10 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
-        sigRefs = concatMap refsFromSignature (universeBi hsGroup)
+        sigRefs =
+          case hs_valds hsGroup of
+            ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
+            _ -> []
         refContext = Nothing
     in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
@@ -389,8 +392,8 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
 
-    refsFromSignature :: Sig Name -> [Reference]
-    refsFromSignature sig = case sig of
+    refsFromSignature :: LSig Name -> [Reference]
+    refsFromSignature (L _ sig) = case sig of
         TypeSig names _ _ ->
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
         _ -> []
