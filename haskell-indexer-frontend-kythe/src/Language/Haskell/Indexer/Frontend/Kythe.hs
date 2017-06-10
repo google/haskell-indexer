@@ -67,8 +67,9 @@ toKythe basevn content XRef{..} = do
                           (analysedOriginalPath xrefFile)
                           encodedContent
         env = ConversionEnv filevn pkgvn table basevn
-    sourceList pkgEntries
-    sourceList fileEntries
+        -- Files are children of the package they belong to.
+        pkgFileEntry = edge filevn ChildOfE pkgvn
+    sourceList (pkgFileEntry : pkgEntries ++ fileEntries)
     flip runReaderT env $ do
         -- Note: Kythe schema doesn't do 'define/binding' on package which
         -- makes sense generally. So we don't do so either from Haskell.
@@ -145,7 +146,7 @@ makeDeclFacts decl@Decl{..} = do
                          -- Decl entries too in backend.
                          Nothing
     childOfModule <- if tickUniqueInModule declTick
-        then Just <$> pure (edge declVName ChildOfE) <*> asks pkgVName
+        then Just . edge declVName ChildOfE <$> asks pkgVName
         else return Nothing
     return (declFacts ++ anchorEntries ++ maybeToList childOfModule)
 
