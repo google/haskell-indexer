@@ -30,6 +30,7 @@ module Language.Haskell.Indexer.Translate
     --
     , XRef(..)
     , AnalysedFile(..)
+    , ModuleTick(..)
     , Decl(..)
     , DeclExtra(..), emptyExtra, withExtra
     , PkgModule(..)
@@ -68,8 +69,9 @@ spanFile (Span (Pos _ _ f) _) = f
 -- Contains lists, to give lazy evaluation a chance and results can eventually
 -- be streamed with lower peek memory residency.
 data XRef = XRef
-    { xrefFile :: !AnalysedFile
-    , xrefDecls :: [Decl]
+    { xrefFile      :: !AnalysedFile
+    , xrefModule    :: !ModuleTick
+    , xrefDecls     :: [Decl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     }
@@ -83,6 +85,16 @@ data AnalysedFile = AnalysedFile
     , analysedOriginalPath :: !SourcePath
       -- ^ A nice, abstract path, which developers think of as the location of
       --   the file. Ideally stripped of temporary workdirs.
+    }
+    deriving (Eq, Show)
+
+-- | Info
+data ModuleTick = ModuleTick
+    { mtPkgModule :: !PkgModule
+    , mtSpan      :: !(Maybe Span)
+      -- ^ Span of the module name.
+      -- For example, 'X' in 'module X where'.
+      -- Main modules can have this missing.
     }
     deriving (Eq, Show)
 
@@ -101,6 +113,8 @@ data Tick = Tick
       --   tick string. Use other spans in Decl for source linking.
     , tickUniqueInModule :: !Bool
       -- ^ If true, the generated unique name can omit the span.
+      --   This usually signals top levelness too.
+      --   TODO(robinpalotai): make the distinction clear? Rename?
     , tickTermLevel :: !Bool
       -- ^ Needed to disambiguate same name occuring in term and type level.
     }

@@ -111,7 +111,11 @@ analyseTypechecked ghcEnv opts tm =
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
         rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
         decls = map daDecl declsAlts
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) decls refs rels
+        moduleTick = give ctx $
+            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
+                         (extractModuleName ctx (ecModule ctx))
+    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
+            decls refs rels
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
@@ -165,6 +169,11 @@ modifyDecl declMods decl =
   where
     applyMod (MethodForInstance i) =
         withExtra (\e -> e {methodForInstance = Just $! i}) decl
+
+mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
+mkModuleTick lhsm pm = ModuleTick pm span
+  where
+    span = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.

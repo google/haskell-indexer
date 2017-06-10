@@ -5,7 +5,6 @@ module Module where
 
 -- - @someTopLevel defines/binding TopDecl
 -- - TopDecl childof Pkg
-someTopLevel :: Int
 someTopLevel = 3
 
 -- Files belonging to a package+module are children of that package+module.
