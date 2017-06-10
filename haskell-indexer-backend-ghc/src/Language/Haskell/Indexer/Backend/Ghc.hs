@@ -172,9 +172,9 @@ modifyDecl declMods decl =
 
 -- | Bundles up the module name with its source span.
 mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
-mkModuleTick lhsm pm = ModuleTick pm span
+mkModuleTick lhsm pm = ModuleTick pm moduleNameSpan
   where
-    span = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
+    moduleNameSpan = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
