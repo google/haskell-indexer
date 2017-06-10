@@ -376,8 +376,12 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
+        sigRefs = case hs_valds hsGroup of
+            ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
+            ValBindsIn _ lsigs ->
+                error "should not hit ValBindsIn when accessing renamed AST"
         refContext = Nothing
-    in map (toTickReference ctx refContext declAlts) typeRefs
+    in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
     refsFromHsType :: LHsType Name -> Maybe Reference
     refsFromHsType (L l ty) = case ty of
@@ -387,6 +391,12 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         HsTyVar n -> give ctx (nameLocToRef n Ref l)
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
+
+    refsFromSignature :: LSig Name -> [Reference]
+    refsFromSignature (L _ sig) = case sig of
+        TypeSig names _ _ ->
+            mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
+        _ -> []
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
