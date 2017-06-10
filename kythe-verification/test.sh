@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(robinp): take these from outer env if present.
 GHC_KYTHE=ghc_kythe_wrapper
 VERIFIER=/opt/kythe/tools/verifier
 
@@ -27,6 +28,16 @@ die() {
   echo "* THERE WAS AN ERROR, SEE ABOVE *"
   echo "*********************************"
 }
+
+if [[ ! -f "$(which $GHC_KYTHE)" ]]; then
+    echo "* GHC-Kythe wrapper [$GHC_KYTHE] not found! See Readme."
+    exit -1
+fi
+
+if [[ ! -f "$VERIFIER" ]]; then
+    echo "* Kythe verifier [$VERIFIER] not found! See Readme."
+    exit -1
+fi
 
 for fut in \
     "$BASIC/Anchors.hs" \
