@@ -275,6 +275,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         in top:(fromSigs ++ tyvars)
       where
         sigDecls (TypeSig lnames ty) = map (dataLikeDecl ty) lnames
+        sigDecls (ClassOpSig _ lnames ty) = map (dataLikeDecl ty) lnames
         -- TODO(robinpalotai): others?
         sigDecls _ = []
     -- Other
