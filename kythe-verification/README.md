@@ -15,7 +15,8 @@ The verifier script expects `ghc_kythe_wrapper` to be on the `PATH`.
 For example, if you use stack, do `stack install` in the base directory.
 
 The script also expects the Kythe verifier tool to be in
-`/opt/kythe/tools/verifier`. Please look into the script to change, or fix #24.
+`/opt/kythe/tools/verifier`. Please look into the script to change, or fix
+[#24](https://github.com/google/haskell-indexer/issues/24).
 
 Change to the `kythe-verification` directory and run `./test.sh`.
 
