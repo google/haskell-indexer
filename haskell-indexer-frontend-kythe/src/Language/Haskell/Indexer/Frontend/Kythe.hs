@@ -109,8 +109,7 @@ makeUsageFacts TickReference{..} = do
     --   anchor) and ref/call (with anchor spanning also the args).
     targetVname <- tickVName refTargetTick
     mbCallContext <- traverse tickVName refHighLevelContext
-    let edgeType =
-          case refKind of
+    let edgeType = case refKind of
             Ref -> RefE
             Call -> RefE
             TypeDecl -> RefDocE
