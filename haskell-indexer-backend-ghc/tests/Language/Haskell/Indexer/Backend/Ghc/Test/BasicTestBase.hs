@@ -50,7 +50,11 @@ testRecursiveRef = assertXRefsFrom "basic/RecursiveRef.hs" $ do
         _ -> checking $ assertFailure "Usage count differs"
     -- Recursive fun with type signature should target using the
     -- polymorphic binding.
-    declAt (11,1) >>= singleUsage >>= includesPos (11,16)
+    declAt (11,1) >>= usages >>= \case
+        [u1, u2] -> do
+            includesPos (10,1) u1
+            includesPos (11,16) u2
+        us -> checking $ assertFailure $ "Usage count differs " ++ show us
     -- Other interesting cases.
     declAt (13,1) >>= singleUsage >>= includesPos (14,16)
     declAt (14,1) >>= singleUsage >>= includesPos (13,16)

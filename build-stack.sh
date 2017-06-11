@@ -21,11 +21,7 @@ export REALGHC=$(stack path --compiler-exe)
 # ghc_kythe_wrapper (from local-install-root) on the PATH. Note that stack
 # wrapper ghc script replaces the system ghc.
 PATH=$PWD/wrappers/stack:$(stack path --compiler-bin):$PATH:$(stack path --local-install-root)/bin \
-<<<<<<< HEAD
-  stack --system-ghc build --force-dirty ${@:2}
-=======
   stack --system-ghc build --no-nix --force-dirty ${@:2}
->>>>>>> 27384c295c337940020459407cb4645f7fe08484
 [[ $? != 0 ]] && fail "Indexing failed!"
 
 # Serve the index

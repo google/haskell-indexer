@@ -78,7 +78,7 @@ declAt pos = declsAt pos >>= \case
     [d] -> return d
     ds -> failConcat
         [ "Multiple declarations at pos ", show pos
-        , ":\n", prettyDecls ds
+        , ":\n", show ds
         ]
 
 prettySpan :: Span -> String
@@ -105,7 +105,6 @@ prettyDecl decl = "Decl {type: " ++ show (declQualifiedType $ declType decl)
 
 prettyReference :: TickReference -> String
 prettyReference ref = "TickReference {"
-                   ++ "ident: " ++ show (refTargetIdentifier ref)
                    ++ ", pos: " ++ prettySpan (refSourceSpan ref)
                    ++ "}"
 
