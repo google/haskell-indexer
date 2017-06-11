@@ -15,12 +15,6 @@ packages:
 - kythe-schema
 - text-offset
 
-extra-deps:
-# proto-lens is not yet in Stackage.
-- proto-lens-0.1.0.4
-- proto-lens-combinators-0.1.0.4
-- proto-lens-protoc-0.1.0.4
-
 # Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
 # `proto-lens-protoc` in stack's local DB.  See:
 # https://github.com/google/proto-lens/blob/master/README.md#using-cabal
