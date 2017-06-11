@@ -441,7 +441,7 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         let fromAlt = altTickToPrimary declAlts
         in Relation (fromAlt s) k (fromAlt t)
 
--- | Exports subclasses/overrides relationships from typeclasses.
+-- | Exports module imports.
 importsFromRenamed :: ExtractCtx -> RenamedSource -> [Import]
 importsFromRenamed ctx (_, lImportDecls, _, _) = map mkImport lImportDecls
   where

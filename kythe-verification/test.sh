@@ -51,7 +51,6 @@ for fut in \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
     "$BASIC/ImportsRef.hs" \
-    "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
     "$BASIC/TypeDef.hs"
 do
   echo "Verifying: $fut"
