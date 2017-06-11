@@ -17,6 +17,7 @@ module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     ( checking
     , assertAll
     , debugAll
+    , prettyReference
     --
     , funk, bind2
     --
@@ -75,8 +76,37 @@ declAt pos = declsAt pos >>= \case
     [d] -> return d
     ds -> failConcat
         [ "Multiple declarations at pos ", show pos
-        , ":\n", show ds
+        , ":\n", prettyDecls ds
         ]
+
+prettySpan :: Span -> String
+prettySpan (Span (Pos l1 c1 _) (Pos l2 c2 _)) = concat
+    [ "("
+    , show l1, ":", show c1
+    , ","
+    , show l2, ":", show c2
+    , ")"
+    ]
+
+prettyDecls :: [Decl] -> String
+prettyDecls ds = L.intercalate "\n" (map prettyDecl ds) ++ "\n"
+
+prettyDecl :: Decl -> String
+prettyDecl decl = "Decl {type: " ++ show (declQualifiedType $ declType decl)
+                                 ++ pos
+                  ++ ", extra: " ++ show (declExtra decl)
+                                 ++ "}"
+  where
+    pos = case declIdentifierSpan decl of
+        Just s -> ", pos: " ++ prettySpan s
+        Nothing   -> ""
+
+prettyReference :: TickReference -> String
+prettyReference ref = "TickReference {"
+                   ++ "ident: " ++ show (refTargetIdentifier ref)
+                   ++ ", pos: " ++ prettySpan (refSourceSpan ref)
+                   ++ "}"
+
 
 containsPos :: (Spanny a) => (Int,Int) -> a -> Bool
 containsPos pos a = case spanOf a of
@@ -90,7 +120,7 @@ usages :: Decl -> ReaderT XRef IO [TickReference]
 usages decl = do
     res <- filter ((== declTick decl) . refTargetTick) <$> asks xrefCrossRefs
     liftIO $ not (null res) @? concat
-        [ "No usages found for decl ", show decl ]
+        [ "No usages found for decl ", prettyDecl decl ]
     return $! L.sortBy (comparing refSourceSpan) res
 
 -- | Returns the single usage of the given declaration.
@@ -100,8 +130,8 @@ singleUsage decl = usages decl >>= \case
     [] -> error "usages should have caught empty usages"
     [u] -> return u
     us -> failConcat
-        [ "Multiple usages of decl ", show decl
-        , ":\n ", show us
+        [ "Multiple usages of decl ", prettyDecl decl
+        , ":\n", L.intercalate "\n" $ map prettyReference us
         ]
 
 -- | Asserts that the given thing's span includes the given position.
@@ -122,7 +152,7 @@ spanIs s e a = case spanOf a of
 
 refKindIs :: (MonadIO m) => ReferenceKind -> TickReference -> m ()
 refKindIs k tr = unless (refKind tr == k) $ failConcat
-    [ "Reference kind of ", show tr, " is not ", show k]
+    [ "Reference kind of ", prettyReference tr, " is not ", show k]
 
 hasRelation :: RelationKind -> Decl -> Decl -> ReaderT XRef IO ()
 hasRelation k s t = do
@@ -136,24 +166,24 @@ hasRelation k s t = do
 refContextIs :: (MonadIO m) => Decl -> TickReference -> m ()
 refContextIs decl tr =
     unless (refHighLevelContext tr == Just (declTick decl)) $ failConcat
-        [ "Reference context of ", show tr, " doesn't match ", show decl ]
+        [ "Reference context of ", prettyReference tr, " doesn't match ", prettyDecl decl ]
 
 userFriendlyTypeIs :: (MonadIO m) => Text -> Decl -> m ()
 userFriendlyTypeIs t decl =
     unless (declUserFriendlyType (declType decl) == t) $ failConcat
-        [ "User-friendly type of ", show decl, " doesn't match ", show t ]
+        [ "User-friendly type of ", prettyDecl decl, " doesn't match ", show t ]
 
 extraMethodForInstanceIs :: (MonadIO m) => Text -> Decl -> m ()
 extraMethodForInstanceIs t decl =
     let emi = declExtra decl >>= methodForInstance
     in unless (emi == Just t) $ failConcat
-          [ "methodForInstance of ", show decl, " doesn't match ", show t ]
+          [ "methodForInstance of ", prettyDecl decl, " doesn't match ", show t ]
 
 extraAlternateIdSpanContainsPos :: (MonadIO m) => (Int, Int) -> Decl -> m ()
 extraAlternateIdSpanContainsPos p decl =
     let idSpan = declExtra decl >>= alternateIdSpan
     in unless ((containsPos p <$> idSpan) == Just True) $ failConcat
-          [ "alternateIdSpan of ", show decl, " doesn't contain pas ", show p ]
+          [ "alternateIdSpan of ", prettyDecl decl, " doesn't contain pas ", show p ]
 
 -- | Sugar for asserting some property of a Decl, for one-off tests.
 -- Frequent usages should have a proper specific function in this module
@@ -164,7 +194,7 @@ declPropEquals f expected decl =
     in unless (prop == expected) $ failConcat
           [ "Expected decl property ", show prop
           , " doesn't match ", show expected
-          , " for decl ", show decl
+          , " for decl ", prettyDecl decl
           ]
 
 -- | Renamed and specialized reexport for convenience.
