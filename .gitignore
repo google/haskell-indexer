@@ -2,3 +2,7 @@
 .stack/
 **/tags
 **/TAGS
+*/dist/
+/dist-newstyle/
+/cabal.sandbox.config
+.cabal-sandbox/
