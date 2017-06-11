@@ -53,6 +53,7 @@ import qualified Language.Kythe.Schema.Raw as Raw
 data NodeKind
     = AnchorNK
     | FileNK
+    | PackageNK
     | VariableNK
 
 -- | Renders node kind to Kythe text value.
@@ -60,6 +61,7 @@ printNodeKind :: NodeKind -> Text
 printNodeKind = \case
     AnchorNK   -> "anchor"
     FileNK     -> "file"
+    PackageNK  -> "package"
     VariableNK -> "variable"
 
 -- | Name of a node fact constrained by the accepted value type.
@@ -171,6 +173,7 @@ data AnchorEdge
     | DefinesBindingE
     | RefE
     | RefCallE
+    | RefDocE    
     | RefImportsE
 
 printEdge :: Edge -> Text
@@ -184,5 +187,6 @@ printEdge = \case
         DefinesBindingE -> "/kythe/edge/defines/binding"
         RefE            -> "/kythe/edge/ref"
         RefCallE        -> "/kythe/edge/ref/call"
+        RefDocE         -> "/kythe/edge/ref/doc"
         RefImportsE     -> "/kythe/edge/ref/imports"
 

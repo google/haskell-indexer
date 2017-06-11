@@ -3,6 +3,16 @@
 # GHC wrapper for indexing Haskell packages.
 # Note that variables INDEXER_OUTPUT_DIR and REALGHC are set outside this script.
 
+if [[ "$INDEXER_OUTPUT_DIR" = "" ]]; then
+    echo "INDEXER_OUTPUT_DIR not set!"
+    exit -1
+fi
+
+if [[ "$REALGHC" = "" ]]; then
+    echo "REALGHC not set!"
+    exit -1
+fi
+
 PKG=$(basename "$(pwd)")
 
 mkdir -p "${INDEXER_OUTPUT_DIR}"

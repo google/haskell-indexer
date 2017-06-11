@@ -112,7 +112,11 @@ analyseTypechecked ghcEnv opts tm =
         rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
         imports = fromMaybe [] (importsFromRenamed ctx <$> renSource)
         decls = map daDecl declsAlts
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) decls refs rels imports
+        moduleTick = give ctx $
+            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
+                         (extractModuleName ctx (ecModule ctx))
+    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
+            decls refs rels imports
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
@@ -166,6 +170,12 @@ modifyDecl declMods decl =
   where
     applyMod (MethodForInstance i) =
         withExtra (\e -> e {methodForInstance = Just $! i}) decl
+
+-- | Bundles up the module name with its source span.
+mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
+mkModuleTick lhsm pm = ModuleTick pm moduleNameSpan
+  where
+    moduleNameSpan = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
@@ -377,8 +387,12 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
+        sigRefs = case hs_valds hsGroup of
+            ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
+            ValBindsIn _ lsigs ->
+                error "should not hit ValBindsIn when accessing renamed AST"
         refContext = Nothing
-    in map (toTickReference ctx refContext declAlts) typeRefs
+    in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
     refsFromHsType :: LHsType Name -> Maybe Reference
     refsFromHsType (L l ty) = case ty of
@@ -388,6 +402,12 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         HsTyVar n -> give ctx (nameLocToRef n Ref l)
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
+
+    refsFromSignature :: LSig Name -> [Reference]
+    refsFromSignature (L _ sig) = case sig of
+        TypeSig names _ _ ->
+            mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
+        _ -> []
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
@@ -929,8 +949,7 @@ toTickReference
     -> TickReference
 toTickReference ctx refContext declAlts (Reference name refKind span0) =
     let tick = nameInModuleToTick ctx name
-        ident = nameOccurenceText name
-    in TickReference (replaceWithPrimary tick) ident span0
+    in TickReference (replaceWithPrimary tick) span0
                       (replaceWithPrimary <$> refContext) refKind
         where
           replaceWithPrimary = altTickToPrimary declAlts
