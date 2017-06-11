@@ -171,6 +171,7 @@ data AnchorEdge
     | DefinesBindingE
     | RefE
     | RefCallE
+    | RefImportsE
 
 printEdge :: Edge -> Text
 printEdge = \case
@@ -183,4 +184,5 @@ printEdge = \case
         DefinesBindingE -> "/kythe/edge/defines/binding"
         RefE            -> "/kythe/edge/ref"
         RefCallE        -> "/kythe/edge/ref/call"
+        RefImportsE     -> "/kythe/edge/ref/imports"
 

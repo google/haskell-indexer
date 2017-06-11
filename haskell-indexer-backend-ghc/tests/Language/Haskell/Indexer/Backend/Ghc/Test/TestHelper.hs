@@ -85,6 +85,7 @@ mergeRefs = Foldable.foldr1 merge
         , xrefDecls = xrefDecls a ++ xrefDecls b
         , xrefCrossRefs = xrefCrossRefs a ++ xrefCrossRefs b
         , xrefRelations = xrefRelations a ++ xrefRelations b
+        , xrefImports = xrefImports a ++ xrefImports b
         }
 
 analyiseFullPath :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)

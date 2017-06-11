@@ -37,6 +37,7 @@ for fut in \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
+    "$BASIC/ImportsRef.hs" \
     "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs"
 do
   echo "Verifying: $fut"

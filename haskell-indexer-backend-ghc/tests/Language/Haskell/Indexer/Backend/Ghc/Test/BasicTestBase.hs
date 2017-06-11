@@ -281,6 +281,12 @@ testUtf8 = assertXRefsFrom "basic/Utf8.hs" $
         xs -> checking $ assertFailure
             ("Different use count for unicodey var: " ++ show (length xs))
 
+-- | Test that the module imports are emitted.
+testImports :: AssertionInEnv
+testImports = assertXRefsFrom "basic/Imports.hs" $ do
+    hasImportAt "Data.Text" (3, 8)
+    hasImportAt "Data.List" (4, 8)
+
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
 allTests env =
@@ -299,6 +305,7 @@ allTests env =
     , envTestCase "record-write" testRecordWrite
     , envTestCase "data-con-wrap" testDataConWrap
     , envTestCase "utf8" testUtf8
+    , envTestCase "imports" testImports
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

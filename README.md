@@ -19,6 +19,10 @@ release](https://github.com/google/kythe/releases) and unpack it.
 tar xzf kythe-v0.0.26.tar.gz -C /opt/
 rm -r /opt/kythe
 ln -s /opt/kythe-v0.0.26 /opt/kythe
+<<<<<<< HEAD
+=======
+chmod -R 755 /opt/kythe/web/ui  # It misses permission by default.
+>>>>>>> 27384c295c337940020459407cb4645f7fe08484
 ```
 
 Version `v0.0.26` is verified to work with Haskell indexer.
@@ -33,6 +37,12 @@ binary in the PATH.
 unzip -j protoc-*-linux-x86_64.zip bin/protoc -d /usr/local/bin/
 ```
 
+<<<<<<< HEAD
+=======
+> If you use have Nix installed and you use `stack --nix`, you do not need to do
+> this.
+
+>>>>>>> 27384c295c337940020459407cb4645f7fe08484
 # Build the project
 
 Use the following to build and run tests:
@@ -55,6 +65,13 @@ The script temporarily replaces the system GHC with
 `wrappers/stack-docker/fake-stack/ghc` script, does the indexing and serves the
 built index at `localhost:8080`.
 
+<<<<<<< HEAD
+=======
+If you get empty index, look at `/tmp/logs/*.stderr` files about possible
+indexing errors. Also make sure that you `/tmp/logs/*.entries` files are not
+empty. If they are, there was some trouble with indexing.
+
+>>>>>>> 27384c295c337940020459407cb4645f7fe08484
 ## Indexing using Docker
 
 If you plan to use the Dockerized build feature of stack, please install
@@ -66,4 +83,8 @@ section.
 The docker image has all C library dependencies so it's possible to use it to
 index the whole Stackage snapshot. See `stack-build-docker.sh` for a
 comprehensive example of indexing a stackage snapshot, and serving a Kythe
+<<<<<<< HEAD
 index.
+=======
+index.
+>>>>>>> 27384c295c337940020459407cb4645f7fe08484

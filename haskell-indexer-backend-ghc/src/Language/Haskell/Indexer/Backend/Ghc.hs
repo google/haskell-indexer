@@ -110,8 +110,9 @@ analyseTypechecked ghcEnv opts tm =
             tcRefs = refsFromTypechecked ctx tcSource altMap
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
         rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
+        imports = fromMaybe [] (importsFromRenamed ctx <$> renSource)
         decls = map daDecl declsAlts
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) decls refs rels
+    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) decls refs rels imports
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
@@ -420,6 +421,25 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         let fromAlt = altTickToPrimary declAlts
         in Relation (fromAlt s) k (fromAlt t)
 
+-- | Exports subclasses/overrides relationships from typeclasses.
+importsFromRenamed :: ExtractCtx -> RenamedSource -> [Import]
+importsFromRenamed ctx (_, lImportDecls, _, _) = map mkImport lImportDecls
+  where
+    mkTick :: ImportDecl Name -> Tick
+    mkTick implDecl = Tick
+      { tickSourcePath = ecSourcePath ctx
+      , tickPkgModule = extractModuleName ctx (ecModule ctx)
+      , tickThing = T.pack . moduleNameString . unLoc $ ideclName implDecl
+      , tickSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
+      , tickUniqueInModule = False
+      , tickTermLevel = True
+      }
+
+    mkImport :: LImportDecl Name -> Import
+    mkImport (L _ implDecl) = Import
+      { importTick = mkTick implDecl
+      }
+
 -- | Fabricates an instance method tick based on RenamedSource data. The
 -- fabricated tick should be the same the TypecheckedSource-based declaration
 -- will contain.
@@ -437,7 +457,7 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
 
 -- | Returns the (source-based, generated) bindings.
 --
--- The matchgroup (~implementatio) of compiler-generated bindings should not be
+-- The matchgroup (~implementation) of compiler-generated bindings should not be
 -- extracted, since they contain both artificial references and strange
 -- declarations.
 --
