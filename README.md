@@ -44,7 +44,10 @@ Use the following to build and run tests:
 ```
 git clone --recursive https://github.com/google/haskell-indexer.git
 cd haskell-indexer
-stack build
+export STACK_YAML=$(readlink -f stack-8.17.yaml)
+stack build && stack test
+# To test Kythe frontend:
+pushd kythe-verification; stack install && ./test.sh; popd
 ```
 
 # Demo
