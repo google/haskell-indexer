@@ -78,7 +78,7 @@ declAt pos = declsAt pos >>= \case
     [d] -> return d
     ds -> failConcat
         [ "Multiple declarations at pos ", show pos
-        , ":\n", show ds
+        , ":\n", prettyDecls ds
         ]
 
 prettySpan :: Span -> String

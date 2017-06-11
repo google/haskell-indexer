@@ -447,18 +447,26 @@ importsFromRenamed ctx (_, lImportDecls, _, _) = map mkImport lImportDecls
   where
     mkTick :: ImportDecl Name -> Tick
     mkTick implDecl = Tick
-      { tickSourcePath = ecSourcePath ctx
-      , tickPkgModule = extractModuleName ctx (ecModule ctx)
-      , tickThing = T.pack . moduleNameString . unLoc $ ideclName implDecl
-      , tickSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
-      , tickUniqueInModule = False
-      , tickTermLevel = True
-      }
+        { tickSourcePath = ecSourcePath ctx
+        , tickPkgModule = PkgModule
+            { getPackage = ""
+              -- ^ Unfortunately, GHC AST doesn't fully qualify the import and
+              -- provide the module's package.
+            , getModule = moduleName
+            }
+        , tickThing = moduleName
+        , tickSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
+        , tickUniqueInModule = True
+        , tickTermLevel = True
+        }
+      where
+        moduleName :: Text
+        moduleName = T.pack . moduleNameString . unLoc $ ideclName implDecl
 
     mkImport :: LImportDecl Name -> Import
     mkImport (L _ implDecl) = Import
-      { importTick = mkTick implDecl
-      }
+        { importTick = mkTick implDecl
+        }
 
 -- | Fabricates an instance method tick based on RenamedSource data. The
 -- fabricated tick should be the same the TypecheckedSource-based declaration
