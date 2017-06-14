@@ -489,12 +489,16 @@ partitionTopLevelBindsByMatchGroupOrigin =
   where
     isFromSource = \case
         FunBind _ mg _ _ _ -> not . GHC.isGenerated . mg_origin $ mg
-        AbsBinds _ _ _ _ binds ->
+        AbsBinds _ _ _ _ binds -> goAbs binds
             -- Practically there will be a FunBind below which holds the truth.
             -- Except typeclass instance methods, which will have an extra
             -- layer of AbsBinds, but the recursion takes care of that.
-            null . snd . partitionTopLevelBindsByMatchGroupOrigin $ binds
+#if __GLASGOW_HASKELL__ >= 800
+        AbsBindsSig _ _ _ _ _ bind -> goAbs (GHC.unitBag bind)
+#endif
         _ -> True
+    --
+    goAbs = null . snd . partitionTopLevelBindsByMatchGroupOrigin
 
 declsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclMods
                      -> [DeclAndAlt]
