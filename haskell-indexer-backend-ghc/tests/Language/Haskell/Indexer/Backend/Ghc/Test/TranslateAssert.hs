@@ -92,7 +92,8 @@ prettyDecls :: [Decl] -> String
 prettyDecls ds = L.intercalate "\n" (map prettyDecl ds) ++ "\n"
 
 prettyDecl :: Decl -> String
-prettyDecl decl = "Decl {type: " ++ show (declQualifiedType $ declType decl)
+prettyDecl decl = "Decl { name: " ++ show (tickThing $ declTick decl)
+                  ++ ", type: " ++ show (declQualifiedType $ declType decl)
                                  ++ pos
                   ++ ", extra: " ++ show (declExtra decl)
                                  ++ "}"

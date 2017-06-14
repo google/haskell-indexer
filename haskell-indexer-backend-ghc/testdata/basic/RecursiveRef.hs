@@ -7,7 +7,7 @@ dummy = localRecNoSig
   where
     localRecNoSig x = localRecNoSig x
 
-recWithSig :: Int -> Int
+recWithSig :: a -> a
 recWithSig x = recWithSig x
 
 mutualNoSigA = mutualNoSigB
