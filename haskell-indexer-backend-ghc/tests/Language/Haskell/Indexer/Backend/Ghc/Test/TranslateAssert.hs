@@ -103,7 +103,6 @@ prettyDecl decl = "Decl {type: " ++ show (declQualifiedType $ declType decl)
 
 prettyReference :: TickReference -> String
 prettyReference ref = "TickReference {"
-                   ++ "ident: " ++ show (refTargetIdentifier ref)
                    ++ ", pos: " ++ prettySpan (refSourceSpan ref)
                    ++ "}"
 

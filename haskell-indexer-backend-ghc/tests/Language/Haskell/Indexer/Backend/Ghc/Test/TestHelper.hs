@@ -82,6 +82,7 @@ mergeRefs = Foldable.foldr1 merge
   where
     merge a b = XRef
         { xrefFile = xrefFile a
+        , xrefModule = xrefModule a
         , xrefDecls = xrefDecls a ++ xrefDecls b
         , xrefCrossRefs = xrefCrossRefs a ++ xrefCrossRefs b
         , xrefRelations = xrefRelations a ++ xrefRelations b
