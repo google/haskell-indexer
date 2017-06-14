@@ -216,22 +216,38 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     mkDeclName n = nameDeclAlt ctx n Nothing typeStringyType
     explicitNames = concatMap namesFromForall . universeBi $ hsGroup
     implicitVarBindDefs =
-        let allUsages = concatMap namesFromTyVar . universeBi $ hsGroup
+        let -- Collect the usages so we can assign a binding at the first usage.
+            -- Note: we could also just omit the location, making it an implicit
+            -- decl. Or put the location as an alternate span.
+            allUsages = mapMaybe nameFromTyVar . universeBi $ hsGroup
             firstUsages = mapMaybe keepFirst
-              . groupBy ((==) `on` fst)
-              . sortBy (comparing fst)
-              . map fromLoc
-              $ allUsages
-        in map mkDecl firstUsages
+                . groupBy ((==) `on` fst)
+                . sortBy (comparing fst)
+                . map fromLoc
+                $ allUsages
+            implicitDefs = Set.fromList . concat $
+                [ concatMap namesFromHsIbSig . universeBi $ hsGroup
+                , concatMap namesFromHsIbWc . universeBi $ hsGroup
+                , concatMap namesFromHsWC . universeBi $ hsGroup
+                ]
+        in map mkDecl . filter (\(n,_) -> Set.member n implicitDefs)
+           $ firstUsages
       where
         mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
         fromLoc (L l n) = (n, l)
         keepFirst [] = Nothing
         keepFirst xs@((name, _):_) = Just $! (name, minimum $ map snd xs)
-
-    namesFromTyVar :: HsType Name -> [Located Name]
-    namesFromTyVar (HsTyVar n) = [n]
-    namesFromTyVar _ = []
+        --
+        nameFromTyVar :: HsType Name -> Maybe (Located Name)
+        nameFromTyVar (HsTyVar n) = Just $! n
+        nameFromTyVar _ = Nothing
+        namesFromHsIbWc :: LHsSigWcType Name -> [Name]
+        namesFromHsIbWc (HsIB names _) = names
+        namesFromHsIbSig :: LHsSigType Name -> [Name]
+        namesFromHsIbSig (HsIB names _) = names
+        namesFromHsWC :: LHsWcType Name -> [Name]
+        namesFromHsWC (HsWC names _ _) = names
+    --
     namesFromForall :: HsType Name -> [Name]
     namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
       where
@@ -303,7 +319,6 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         --    methods are present in the typechecked source (will emit there).
         --    But we emit an identifier override for the methods so they show
         --    up nice in the call-chain.
-        --    Note: we don't emit a displayName override, but maybe we could.
         splitType <- mySplitInstanceType lty
         let niceInstIdentifier = T.pack
                                . filterInstanceName
