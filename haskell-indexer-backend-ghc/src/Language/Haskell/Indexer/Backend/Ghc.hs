@@ -53,6 +53,7 @@ import Var (Var, varName, varType)
 import Control.Arrow (second)
 import Control.Monad (guard)
 import Data.Bool (bool)
+import Data.Data (Data)
 import Data.Either (partitionEithers)
 import Data.Function (on)
 import Data.List (partition, sortBy, groupBy, (\\))
@@ -64,6 +65,7 @@ import Data.Reflection (Given, give, given)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -261,14 +263,13 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         in top:(ctors ++ tyvars)
       where
 #if __GLASGOW_HASKELL__ >= 800
-        --TODO: Handle ConDeclGADT
         conDecls cd@(ConDeclH98 conLName _ _ _ _) =
             dataLikeDecl cd conLName
+        conDecls cd@(ConDeclGADT conLNames _ _) =
+            dataLikeDecl cd (head conLNames)  -- TODO(robinp): all ctors
 #elif __GLASGOW_HASKELL__ >= 710
         conDecls cd@(ConDecl conLNames _ _ _ _ _ _ _) =
-            dataLikeDecl cd (head conLNames)
-            -- There should always be at least one constructor name. Ignore all
-            -- but the first for now.
+            dataLikeDecl cd (head conLNames)  -- TODO(robinp): all ctors
 #endif
     -- Type aliases.
     dataDecls (L _ sd@(SynDecl locName binders _ _)) =
@@ -394,7 +395,8 @@ makeInstanceTick ctx splitType = Tick
     , tickTermLevel = False
     }
 
--- | Collects type-level references.
+-- | Collects type-level references. These visibly appear in type signatures,
+-- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
 refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
@@ -509,7 +511,7 @@ declsFromTypechecked ctx tsrc instDeclMods =
             . partitionInstanceAbsBinds
             $ src
         -- Skip compiler-generated bodies, just extract the top-level def.
-        generated = declsFromHsBinds ctx gen
+        generated = declsFromHsBinds ctx . map (ParentChild Nothing) $ gen
     in fromRegularSrc ++ modifyDecls fromInstanceSrc ++ generated
   where
     modifyDecls = map (mapDeclAndAlt (modifyDecl instDeclMods))
@@ -517,7 +519,7 @@ declsFromTypechecked ctx tsrc instDeclMods =
 -- | Emits function declarations and pattern variables.
 deepDeclsFromTopBind :: ExtractCtx -> LHsBindLR Id Id -> [DeclAndAlt]
 deepDeclsFromTopBind ctx top =
-    let hsbDecls = declsFromHsBinds ctx (universe top)
+    let hsbDecls = declsFromHsBinds ctx (universeWithParents top)
         -- ^ Warning, target type same as source, use universe (not Bi).
         patDecls = mapMaybe declsFromPat . universeBi $ top
     in hsbDecls ++ patDecls
@@ -536,48 +538,69 @@ deepDeclsFromTopBind ctx top =
       where
         varDecl v = varDeclAlt ctx v Nothing
 
+data ParentChild a = ParentChild
+  { pcParent :: !(Maybe a)
+  , pcChild :: !a
+  }
+
+-- | Like 'universe', but serves the elements along with their nearest ancestor
+-- of the same type. The top element will be returned too, but without a parent.
+universeWithParents :: (Data a, Typeable a) => a -> [ParentChild a]
+universeWithParents a = ParentChild Nothing a : go a
+  where
+    go a =
+      let cs = children a
+      in map (ParentChild (Just $! a)) cs ++ concatMap go cs
+
+
 -- | Function declarations from the bindings.
 --
--- There can be overlapping binds in the input, specifically complicated
--- bindings can have both abstraction and function bindings (see
--- 'absFunDeclsFromHsBind'). This is handled by deduping on the monomorphic
--- identifier. In case of such overlap, the declaration returned is based on the
--- polymorphic binding, since it has richer type.
+-- There can be overlapping binds in the input, specifically some
+-- bindings can have both abstraction and function bindings. So we check for
+-- these Abs+Fun bindings, and only emit the binding polymorphic binding from
+-- the Abs, and retarget the monomorphic references to point to the polymorphic.
+--
+-- Note: normally recursive calls target the monomorphic bind, except if the
+-- function has a type signature.
 --
 -- Note: Typechecked fundecls contain record accessors, but not data
 -- constructors - latter are exported from the renamed source.
-declsFromHsBinds :: ExtractCtx -> [LHsBind Id] -> [DeclAndAlt]
-declsFromHsBinds ctx binds =
-    let (abss, funs) = partitionEithers
-                     . concatMap (absFunDeclsFromHsBind ctx)
-                     $ binds
-        -- FunBind will have the same funVar as the monomorphic binding of the
-        -- AbsBind (if there's a corresponding AbsBind).
-        absMonoTicks = mapMaybe daAlt abss
-        funOnlys = filter (not . hasTick absMonoTicks) funs
-    in map (flip DeclAndAlt Nothing) funOnlys ++ abss
+declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind Id)] -> [DeclAndAlt]
+declsFromHsBinds ctx = concatMap thing
   where
-    hasTick :: [Tick] -> Decl -> Bool
-    hasTick ts decl = (declTick decl ==) `any` ts
+    thing (ParentChild Nothing a) = absFunDeclsFromHsBind ctx a
+    thing (ParentChild (Just p) c) =
+        if unLoc c `funUnderAbs` unLoc p
+            then []
+            else absFunDeclsFromHsBind ctx c
+      where
+        funUnderAbs (FunBind _ _ _ _ _) p | isAbs p = True
+          where
+            isAbs = \case
+                AbsBinds _ _ _ _ _ -> True
+                AbsBindsSig _ _ _ _ _ _ -> True
+                _ -> False
+        funUnderAbs _ _ = False
 
 -- | Extracts both AbsBinds and FunBinds. The separation is needed since
 -- deduping is required upstream.
 absFunDeclsFromHsBind
     :: ExtractCtx -> LHsBind Id
-    -> [Either DeclAndAlt Decl]
+    -> [DeclAndAlt]
 absFunDeclsFromHsBind ctx (L _ b) = case b of
     FunBind (L idLoc funVar) _ _ _ _ ->
         let declType = outputableStringyType ctx (varType funVar)
             decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
                              (nameDecl ctx (varName funVar) declType)
-        in [Right decl]
+        in [DeclAndAlt decl Nothing]
     AbsBinds _ _ exports _ _ ->
-        mapMaybe abeVar exports
-          where
-            abeVar abe = do
-                guard . not . isInstanceMethodVar . abe_poly $ abe
-                Just $! Left $! varDeclAlt ctx (abe_poly abe)
-                                               (Just $ abe_mono abe)
+        map abeVar . filter (not . isInstanceMethodVar . abe_poly) $ exports
+      where
+        abeVar abe = varDeclAlt ctx (abe_poly abe) (Just $ abe_mono abe)
+    AbsBindsSig _ _ export _ _ _ ->
+        if not (isInstanceMethodVar export)
+           then [varDeclAlt ctx export Nothing]
+           else []
     _ ->
         -- TODO(robinpalotai): anything to do here?
         []
@@ -701,6 +724,9 @@ instanceAbsBinds = \case
     (L _ (AbsBinds _ _ exports _ binds))
         | (isInstanceMethodVar . abe_poly) `any` exports ->
             Just $! GHC.bagToList binds
+    (L _ (AbsBindsSig _ _ export _ _ bind))
+        | isInstanceMethodVar export ->
+            Just $! [bind]
     _ -> Nothing
 
 -- | Pulls the AbsBinds below the top one up (if typeclass instance method), or
@@ -715,6 +741,7 @@ partitionInstanceAbsBinds
   where
     instToRight b = maybe (Left [b]) Right . instanceAbsBinds $ b
 
+-- | Gathers term-level references.
 refsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclAltMap
                     -> [TickReference]
 refsFromTypechecked ctx tsrc declAlts =
