@@ -543,15 +543,22 @@ deepDeclsFromTopBind ctx top =
     declsFromPat (L _ p) = case p of
         -- Eventually every interesting pattern ends in some variable capturing
         -- patterns.
-        VarPat v -> Just $! varDecl (unLoc v)
+        VarPat v -> Just $! varDeclNoAlt (unLoc v)
         -- Below are special patterns that declare things outside an LPat, so
         -- universe traversal wouldn't capture them. We emit declarations for
         -- these special things (Pats are taken care by above case).
-        AsPat (L _ asVar) _ -> Just $! varDecl asVar
+        AsPat (L _ asVar) _ -> Just $! varDeclNoAlt asVar
         -- Universe covers the rest.
         _ -> Nothing
       where
-        varDecl v = varDeclAlt ctx v Nothing
+        varDeclNoAlt v = varDeclAlt ctx v Nothing
+
+-- | Glorified pair.
+data SureParentChild a = SureParentChild !a !a
+
+-- | Convenience for having the children bundled up with the parent.
+childrenWithParent :: (Data a, Typeable a) => a -> [SureParentChild a]
+childrenWithParent a = map (SureParentChild a) (children a)
 
 data ParentChild a = ParentChild
   { pcParent :: !(Maybe a)
@@ -563,16 +570,15 @@ data ParentChild a = ParentChild
 universeWithParents :: (Data a, Typeable a) => a -> [ParentChild a]
 universeWithParents a = ParentChild Nothing a : go a
   where
-    go a =
-      let cs = children a
-      in map (ParentChild (Just $! a)) cs ++ concatMap go cs
+    go a = let cs = children a
+           in map (ParentChild (Just $! a)) cs ++ concatMap go cs
 
 
 -- | Function declarations from the bindings.
 --
 -- There can be overlapping binds in the input, specifically some
 -- bindings can have both abstraction and function bindings. So we check for
--- these Abs+Fun bindings, and only emit the binding polymorphic binding from
+-- these Abs+Fun bindings, and only emit the polymorphic binding from
 -- the Abs, and retarget the monomorphic references to point to the polymorphic.
 --
 -- Note: normally recursive calls target the monomorphic bind, except if the
@@ -604,9 +610,8 @@ absFunDeclsFromHsBind
     -> [DeclAndAlt]
 absFunDeclsFromHsBind ctx (L _ b) = case b of
     FunBind (L idLoc funVar) _ _ _ _ ->
-        let declType = outputableStringyType ctx (varType funVar)
-            decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
-                             (nameDecl ctx (varName funVar) declType)
+        let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
+                             (varDecl ctx funVar)
         in [DeclAndAlt decl Nothing]
     AbsBinds _ _ exports _ _ ->
         map abeVar . filter (not . isInstanceMethodVar . abe_poly) $ exports
@@ -644,6 +649,10 @@ varDeclAlt :: ExtractCtx -> Var -> Maybe Var -> DeclAndAlt
 varDeclAlt ctx v alt =
     nameDeclAlt ctx (varName v) (FromName . varName <$> alt)
                 (outputableStringyType ctx (varType v))
+
+-- | Like nameDecl but for Vars.
+varDecl :: ExtractCtx -> Var -> Decl
+varDecl ctx v = nameDecl ctx (varName v) (outputableStringyType ctx (varType v))
 
 -- | Defines how to produce an alternate reference target.
 data AlternateRefTarget
@@ -761,7 +770,7 @@ refsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclAltMap
                     -> [TickReference]
 refsFromTypechecked ctx tsrc declAlts =
     let sourceBasedBinds = fst (partitionTopLevelBindsByMatchGroupOrigin tsrc)
-    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= children
+    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= childrenWithParent
            >>= refsFromBelowTop
     -- TODO(robinpalotai): sort out what happens to files in these spans if
     --   there is a preprocessor.
@@ -778,12 +787,18 @@ refsFromTypechecked ctx tsrc declAlts =
     -- suitable - practically FunBind is suitable, PatBind is usually not,
     -- since it is not obvious which part of the pattern should we attribute
     -- references to.
-    refsFromBelowTop (L _ subBind) =
+    refsFromBelowTop (SureParentChild (L _ parent) (L _ subBind)) =
         let exprRefs = concatMap refsFromExpr . universeBi $ subBind
             (patRefs, redirs) = unzip . map refsFromPat . universeBi $ subBind
             refContextTick = case subBind of
-                FunBind (L _ declRef) _ _ _ _ -> Just $!
-                    nameInModuleToTick ctx (varName declRef)
+                FunBind (L _ declRef) _ _ _ _ -> case parent of
+                    -- Note: AbsBindsSig doesn't expose the monomorphic binding,
+                    -- so we can't easily retarget, but the internal FunBind's
+                    -- name is still monomorphic.
+                    AbsBindsSig _ _ poly _ _ _ ->
+                        Just $! nameInModuleToTick ctx (varName poly)
+                    _ ->
+                        Just $! nameInModuleToTick ctx (varName declRef)
                 _ -> Nothing
         in map (toTickReference ctx refContextTick declAlts)
                (postprocess (concat redirs) exprRefs ++ concat patRefs)
