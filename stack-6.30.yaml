@@ -1,6 +1,7 @@
-# Note: for now only GHC API 7.10 is supported, and this is resolver is the
-# latest corresponding one which has an fpco/stack-build docker image. See
-# below why is that useful.
+# Note: LTS 6.30 is the latest LTS 6 version which has an fpco/stack-build
+# docker image. See below why is that useful. If you are not interested in
+# doing a full-stackage index based on docker snapshot, feel free to use
+# other version.
 resolver: lts-6.30
 
 packages:
