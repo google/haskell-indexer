@@ -1,6 +1,3 @@
-# Note: for now only GHC API 7.10 is supported, and this is resolver is the
-# latest corresponding one which has an fpco/stack-build docker image. See
-# below why is that useful.
 resolver: lts-8.17
 
 packages:
@@ -20,18 +17,6 @@ packages:
 # https://github.com/google/proto-lens/blob/master/README.md#using-cabal
 explicit-setup-deps:
   "*": true
-
-# Use the dockerized build if you want to use ghc_kythe_wrapper to index
-# packages build in a respective fpco/stack-build based image. Like indexing
-# all of stackage, or your hermetic packages.
-#
-# See build-stack-docker.sh for details.
-docker:
-  # Use 'stack --docker build' on command line instead.
-  enable: false
-  # fpco/stack-build based image with protoc. Not in any repository, see above
-  # mentioned script which builds it.
-  image: hsidx-build
 
 nix:
   packages: [gcc, protobuf3_2]
