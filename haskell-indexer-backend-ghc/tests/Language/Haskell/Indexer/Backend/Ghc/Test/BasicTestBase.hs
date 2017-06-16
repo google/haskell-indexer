@@ -53,7 +53,7 @@ testRecursiveRef = assertXRefsFrom "basic/RecursiveRef.hs" $ do
     declAt (11,1) >>= usages >>= \case
         [u1, u2] -> do
             -- Note: first one is the ref from the type signature (see #25).
-            includesPos (10,1) u1  
+            includesPos (10,1) u1
             includesPos (11,16) u2
         us -> checking $ assertFailure $ "Usage count differs " ++ show us
     -- Other interesting cases.
