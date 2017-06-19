@@ -664,10 +664,10 @@ universeWithParents a = ParentChild Nothing a : go a
 -- Note: Typechecked fundecls contain record accessors, but not data
 -- constructors - latter are exported from the renamed source.
 declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind Id)] -> [DeclAndAlt]
-declsFromHsBinds ctx = concatMap thing
+declsFromHsBinds ctx = concatMap go
   where
-    thing (ParentChild Nothing a) = absFunDeclsFromHsBind ctx a
-    thing (ParentChild (Just p) c) =
+    go (ParentChild Nothing a) = absFunDeclsFromHsBind ctx a
+    go (ParentChild (Just p) c) =
         if unLoc c `funUnderAbs` unLoc p
             then []
             else absFunDeclsFromHsBind ctx c
@@ -986,10 +986,11 @@ refsFromTypechecked ctx tsrc declAlts =
         HsWrap _ e -> refsFromExpr (L l e)
 #if __GLASGOW_HASKELL__ >= 800
         RecordCon locDataConId _ _ r -> recordConRefs locDataConId r
+        -- TODO(robinp): emit ref to all the possible constructors (also below).
         RecordUpd _ r (RealDataCon dc:_) _ _ _   -> recordUpdRefs dc r
 #else
         RecordCon locDataConId _ r -> recordConRefs locDataConId r
-        RecordUpd _ r (dc:_) _ _   -> recordUpdRefs dc r
+        RecordUpd _ r (dc:_) _ _   -> recordUpdRefs dc (rec_flds r)
 #endif
         -- Others handled by universe.
         _ -> []
@@ -1007,27 +1008,25 @@ refsFromTypechecked ctx tsrc declAlts =
         -- The same-named fields of different datacons are actually just a
         -- single field, so it's ok to pass in an arbitrary DataCon to mine
         -- for reference targets.
-        --recordUpdRefs :: DataCon -> [LHsRecUpdField Id]
-        --              -> [Reference]
-        recordUpdRefs dataCon r =
-            let fieldNames = GHC.dataConFieldLabels dataCon
-                fieldRefs = concatMap (recordFieldRefs fieldNames)
-                          . map (
-                              (ExplicitAssignedRF,)
 #if __GLASGOW_HASKELL__ >= 800
-                              -- We are in Typechecked tree, where ambiguities
-                              -- are already resolved. This is safe.
-                              . (\(HsRecField a b c) -> HsRecField
-                                  (unambiguousFieldOcc <$> a) b c)
+        recordUpdRefs :: DataCon -> [LHsRecUpdField Id] -> [Reference]
+#else
+        recordUpdRefs :: DataCon -> [LHsRecField Id (LHsExpr Id)] -> [Reference]
 #endif
-                              . unLoc
-                            )
-#if __GLASGOW_HASKELL__ < 800
-                          . rec_flds
+        recordUpdRefs dataCon =
+            let fieldNames = GHC.dataConFieldLabels dataCon
+            in concatMap (recordFieldRefs fieldNames)
+                . map (
+                      (ExplicitAssignedRF,)
+#if __GLASGOW_HASKELL__ >= 800
+                        -- We are in Typechecked tree, where ambiguities
+                        -- are already resolved. This is safe.
+                        . (\(HsRecField a b c) -> HsRecField
+                            (unambiguousFieldOcc <$> a) b c)
 #endif
-                          $ r
-            in fieldRefs
-        -- See comments on 'Redirect' about how this should be in the future.
+                        . unLoc
+                      )
+      -- See comments on 'Redirect' about how this should be in the future.
 #if __GLASGOW_HASKELL__ >= 800
         recordFieldRefs
             :: [GHC.FieldLabel] -> (RecFieldCat, HsRecField Id (LHsExpr Id))
