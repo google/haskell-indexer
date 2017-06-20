@@ -1,6 +1,7 @@
 name:                test-package
 version:             0.1.0.0
 license:             Apache-2.0
+license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          robinpalotai@google.com
 copyright:           Google Inc.

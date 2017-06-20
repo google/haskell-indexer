@@ -3,6 +3,7 @@ version:             0.1.0.0
 synopsis:            Library for emitting Kythe schema entries.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
+license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          robinpalotai@google.com
 copyright:           Google Inc.

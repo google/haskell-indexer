@@ -3,6 +3,7 @@ synopsis:            Depends on the content of
                      https://www.stackage.org/lts-6.30/cabal.config.
 version:             0.1.0.0
 license:             BSD3
+license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          robinpalotai@google.com
 copyright:           Google Inc.
