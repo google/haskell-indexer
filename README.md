@@ -54,19 +54,23 @@ pushd kythe-verification; stack install && ./test.sh; popd
 
 # Demo
 
-To index a few packages and serve the index, run:
+To index a few packages, run:
 
-```
+```bash
 ./build-stack.sh /tmp/logs mtlparse cpu
 ```
 
-The script temporarily replaces the system GHC with
-`wrappers/stack-docker/fake-stack/ghc` script, does the indexing and serves the
-built index at `localhost:8080`.
+The script adds a wrapper for the GHC compiler used by Stack (`stack path --compiler-exe`), does the indexing when `ghc --make` is specified on the command line to build a package. You can run `build-stack.sh` multiple times.
+
+To serve the index at `http://localhost:8080`:
+
+```bash
+./serve.sh /tmp/logs localhost:8080
+```
 
 If you get empty index, look at `/tmp/logs/*.stderr` files about possible
-indexing errors. Also make sure that you `/tmp/logs/*.entries` files are not
-empty. If they are, there was some trouble with indexing.
+indexing errors. Also make sure that your `/tmp/logs/*.entries` files are not
+empty. If they are, it indicates that `ghc_kythe_wrapper` failed to index.
 
 ## Indexing using Docker
 
