@@ -4,7 +4,10 @@ for emitting entities for the [Kythe](https://kythe.io) indexing schema.
 
 This is not an official Google product.
 
-# Installation (Linux)
+# Installation
+
+Linux: supported - follow below documentation.
+Windows, MacOS: didn't try - backend part likely compiles, wiring and Kythe frontend likely not (see #38).
 
 ## Stack
 
