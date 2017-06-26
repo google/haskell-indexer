@@ -3,43 +3,27 @@
 # GHC wrapper for indexing Haskell packages.
 # Note that variables INDEXER_OUTPUT_DIR and REALGHC are set outside this script.
 
-if [[ "$INDEXER_OUTPUT_DIR" = "" ]]; then
-    echo "INDEXER_OUTPUT_DIR not set!"
-    exit -1
-fi
-
-if [[ "$REALGHC" = "" ]]; then
-    echo "REALGHC not set!"
-    exit -1
-fi
-
-PKG=$(basename "$(pwd)")
-
-mkdir -p "${INDEXER_OUTPUT_DIR}"
 log() {
-    echo "$1" >> ${INDEXER_OUTPUT_DIR}/${PKG}.log
+    echo "$1" >> "$INDEXER_OUTPUT_DIR/$PKG.log"
 }
 
 log "========= FAKE GHC ======="
-log " == pwd: $(pwd)"
-for arg in $@
-do
-  if [[ "${arg}" == "-static" ]]; then
-    STATIC="true"
-  fi
-  log "ARG: ${arg}"
-done
+log " == pwd: $PWD"
 log "== Passing through.."
 log "$REALGHC $*"
 $REALGHC "$@"
 RESULT=$?
-if [[ "$STATIC" = "true" ]]; then
+# $(stack path --compiler_exe) is invoked by `stack build` multiple times,
+# we are only interested when `--make` is specified.
+if [[ "${@#--make}" != "$@" ]]; then
+  PKG=${PWD##*/}
   log "== Invoking indexer"
-  ghc_kythe_wrapper \
+  if ! ghc_kythe_wrapper \
     --drop_path_prefix './' \
-    --prepend_path_prefix "${PKG}/" \
+    --prepend_path_prefix "$PKG/" \
     -- \
-    "$@" >> ${INDEXER_OUTPUT_DIR}/${PKG}.entries 2> ${INDEXER_OUTPUT_DIR}/${PKG}.stderr
-  [[ "$?" != "0" ]] && echo "${PKG} had error" >> ${INDEXER_OUTPUT_DIR}/errors
+    "$@" > "$INDEXER_OUTPUT_DIR/$PKG.entries" 2> "$INDEXER_OUTPUT_DIR/$PKG.stderr"; then
+    echo "$PKG had error" >> "$INDEXER_OUTPUT_DIR/errors"
+  fi
 fi
 exit $RESULT
