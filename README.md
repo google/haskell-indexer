@@ -72,7 +72,7 @@ To serve the index at `http://localhost:8080`:
 ```
 
 If you get empty index, look at `/tmp/logs/*.stderr` files about possible
-indexing errors. Also make sure that your `/tmp/logs/*.entries` files are not
+indexing errors. Also, make sure that your `/tmp/logs/*.entries` files are not
 empty. If they are, it indicates that `ghc_kythe_wrapper` failed to index.
 
 ## Indexing using Docker
@@ -85,5 +85,5 @@ section.
 
 The docker image has all C library dependencies so it's possible to use it to
 index the whole Stackage snapshot. See `stack-build-docker.sh` for a
-comprehensive example of indexing a stackage snapshot, and serving a Kythe
+comprehensive example of indexing a Stackage snapshot, and serving a Kythe
 index.
