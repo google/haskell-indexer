@@ -15,7 +15,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module Language.Haskell.Indexer.Translate.Utils
-    ( spanTickFragment  -- ^ TODO(robinpalotai): rename?
+    ( spanTickFragment  -- TODO(robinpalotai): rename?
     , tickString
     ) where
 

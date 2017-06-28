@@ -1,6 +1,8 @@
 name:                text-offset
 version:             0.1.0.0
 synopsis:            Library for converting between line/column and byte offset.
+description:         Useful for translating visual line/column info (from
+                     editor or warning message) to byte offset. Assumes UTF-8.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE
