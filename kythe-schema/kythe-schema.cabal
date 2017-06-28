@@ -1,6 +1,7 @@
 name:                kythe-schema
 version:             0.1.0.0
 synopsis:            Library for emitting Kythe schema entries.
+description:         See README.md.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE

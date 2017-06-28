@@ -277,7 +277,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
                                 typeStringyType
             Implicit  -> implicitCase
             Qualified -> implicitCase
-                -- ^ Quoting Note [HsForAllTy tyvar binders]:
+                -- Quoting Note [HsForAllTy tyvar binders]:
                 --
                 -- "Qualified currently behaves exactly as Implicit, but it is
                 -- deprecated to use it for implicit quantification."
@@ -465,12 +465,11 @@ makeInstanceTick ctx splitType = Tick
     , tickThing = T.pack . filterInstanceName $!
           ghcPrintUnqualified (ecGhcEnv ctx)
                               (unLoc $ classAndInstance splitType)
-      -- ^ Unlike Purescript, instances don't have a name by default, so
+      -- Unlike Purescript, instances don't have a name by default, so
       -- we invent one that should be unique in the module.
     , tickSpan = give ctx ((srcSpanToSpan . getLoc . classAndInstance) splitType)
     , tickUniqueInModule = False
-      -- ^ Could be True, but let's keep False, which is more in line with
-      -- AST.
+      -- Could be True, but let's keep False, which is more in line with AST.
     , tickTermLevel = False
     }
 
