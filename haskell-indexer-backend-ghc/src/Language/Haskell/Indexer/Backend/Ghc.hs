@@ -35,7 +35,7 @@ import qualified Name as GHC
 import FastString (unpackFS)
 import GHC
 import qualified Id as GHC
-import Module (packageKeyString)
+import Module (packageKeyString, modulePackageKey)
 import Name (nameModule_maybe, nameOccName)
 import qualified Outputable as GHC
 import OccName (occNameString)
@@ -89,33 +89,33 @@ data ExtractCtx = ExtractCtx
     , ecOptions    :: !AnalysisOptions
     }
 
-analyseTypechecked :: GhcEnv -> AnalysisOptions -> TypecheckedModule -> XRef
-analyseTypechecked ghcEnv opts tm =
+analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModule -> m XRef
+analyseTypechecked ghcEnv opts tm = do
     let modSummary = pm_mod_summary . tm_parsed_module $ tm
         -- Analysed modules always arrive as file references in practice.
-        modFile = T.pack $!
+    let modFile = T.pack $!
                       fromMaybe "?" (ml_hs_file . ms_location $ modSummary)
-        strippedModFile = SourcePath (aoFilePathTransform opts modFile)
-        ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
-        renSource = tm_renamed_source tm  :: Maybe RenamedSource
-        tcSource = tm_typechecked_source tm
-        declsAlts =
+    let strippedModFile = SourcePath (aoFilePathTransform opts modFile)
+    let ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
+    let renSource = tm_renamed_source tm  :: Maybe RenamedSource
+    let tcSource = tm_typechecked_source tm
+    let declsAlts =
             let (fromRenamed, declMods) =
                     fromMaybe mempty (declsFromRenamed ctx <$> renSource)
                 fromTypechecked = declsFromTypechecked ctx tcSource declMods
             in fromRenamed ++ fromTypechecked
-        altMap = declAltMap declsAlts
-        refs = tcRefs ++ renamedRefs
+    let altMap = declAltMap declsAlts
+    let refs = tcRefs ++ renamedRefs
           where
             tcRefs = refsFromTypechecked ctx tcSource altMap
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
-        rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
-        imports = fromMaybe [] (importsFromRenamed ctx <$> renSource)
-        decls = map daDecl declsAlts
-        moduleTick = give ctx $
+    let rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
+    imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
+    let decls = map daDecl declsAlts
+    let moduleTick = give ctx $
             mkModuleTick (pm_parsed_source (tm_parsed_module tm))
                          (extractModuleName ctx (ecModule ctx))
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
+    return $ XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
             decls refs rels imports
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
@@ -442,31 +442,22 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         in Relation (fromAlt s) k (fromAlt t)
 
 -- | Exports module imports.
-importsFromRenamed :: ExtractCtx -> RenamedSource -> [Import]
-importsFromRenamed ctx (_, lImportDecls, _, _) = map mkImport lImportDecls
+importsFromRenamed :: GhcMonad m => ExtractCtx -> RenamedSource -> m [ModuleTick]
+importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
   where
-    mkTick :: ImportDecl Name -> Tick
-    mkTick implDecl = Tick
-        { tickSourcePath = ecSourcePath ctx
-        , tickPkgModule = PkgModule
-            { getPackage = ""
-              -- ^ Unfortunately, GHC AST doesn't fully qualify the import and
-              -- provide the module's package.
-            , getModule = moduleName
-            }
-        , tickThing = moduleName
-        , tickSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
-        , tickUniqueInModule = True
-        , tickTermLevel = True
-        }
-      where
-        moduleName :: Text
-        moduleName = T.pack . moduleNameString . unLoc $ ideclName implDecl
+    mkImport :: GhcMonad m => LImportDecl Name -> m ModuleTick
+    mkImport (L _ implDecl) = do
+      pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
+      let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
+      return $ ModuleTick pkgModule pkgSpan
 
-    mkImport :: LImportDecl Name -> Import
-    mkImport (L _ implDecl) = Import
-        { importTick = mkTick implDecl
-        }
+    extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
+    extractPkgModule name = do
+      m <- findModule name Nothing
+      let pkg = T.pack . packageKeyString . modulePackageKey $ m
+      let mName = T.pack . moduleNameString . moduleName $ m
+      return $ PkgModule pkg mName
+
 
 -- | Fabricates an instance method tick based on RenamedSource data. The
 -- fabricated tick should be the same the TypecheckedSource-based declaration

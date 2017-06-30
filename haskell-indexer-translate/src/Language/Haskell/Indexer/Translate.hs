@@ -37,7 +37,6 @@ module Language.Haskell.Indexer.Translate
     , StringyType(..)
     , TickReference(..), ReferenceKind(..)
     , Relation(..), RelationKind(..)
-    , Import(..)
     ) where
 
 import Data.Maybe (fromMaybe)
@@ -75,7 +74,7 @@ data XRef = XRef
     , xrefDecls     :: [Decl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
-    , xrefImports :: [Import]
+    , xrefImports :: [ModuleTick]
     }
     deriving (Eq, Show)
 
@@ -239,12 +238,6 @@ data Relation = Relation
 
 data RelationKind = ImplementsMethod | InstantiatesClass
     deriving (Eq, Ord, Show)
-
--- | Module import
-data Import = Import
-    { importTick :: !Tick
-    }
-    deriving (Eq, Show)
 
 -- | An unqualified id for the purpose of displaying to users.
 -- No newtype for this, as we don't do anything with it apart from emitting.

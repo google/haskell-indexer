@@ -47,6 +47,7 @@ Test-Suite basic_test
   build-depends: base
                , bytestring
                , filepath
+               , ghc
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1
@@ -70,6 +71,7 @@ Test-Suite typelink_test
   build-depends: base
                , bytestring
                , filepath
+               , ghc
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1

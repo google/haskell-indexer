@@ -123,9 +123,9 @@ hasImportAt importName pos = do
         ims -> failConcat
             ["Multiple imports at pos ", show pos , ":\n", show ims]
     where
-      equalsImport :: String -> (Int,Int) -> Import -> Bool
+      equalsImport :: String -> (Int,Int) -> ModuleTick -> Bool
       equalsImport importName pos imp =
-          containsPos pos imp && importName == (T.unpack . tickThing . importTick $ imp)
+          containsPos pos imp && importName == (T.unpack . getModule . mtPkgModule $ imp)
 
 containsPos :: (Spanny a) => (Int,Int) -> a -> Bool
 containsPos pos a = case spanOf a of
@@ -248,5 +248,5 @@ instance Spanny Decl where
 instance Spanny TickReference where
     spanOf = Just . refSourceSpan
 
-instance Spanny Import where
-    spanOf = tickSpan . importTick 
+instance Spanny ModuleTick where
+    spanOf = mtSpan

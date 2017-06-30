@@ -37,6 +37,8 @@ import qualified Data.Foldable as Foldable
 import qualified Data.IORef as IO
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import GhcMonad (GhcMonad(..))
+import GHC (initGhcMonad)
 import System.FilePath ((</>))
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -66,13 +68,13 @@ assertXRefsFrom f asserts = do
     liftIO (runReaderT asserts xref)
 
 -- | Analyses a test file relative to the 'data' directory.
-analyse :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)
+analyse :: GhcMonad m => FilePath -> ReaderT TestEnv IO (NonEmpty (m XRef))
 analyse dataRelative = do
     fullPath <- (</> dataRelative) <$> asks testDataDirectory
     analyiseFullPath fullPath
 
 -- | Convenience for disregarding the source file of reference data.
-analyseAndMerge :: FilePath -> ReaderT TestEnv IO XRef
+analyseAndMerge :: GhcMonad m => FilePath -> ReaderT TestEnv IO (m XRef)
 analyseAndMerge = fmap mergeRefs . analyse
 
 -- | Merges with terrible list concat performance, keeps an arbitrary file
@@ -89,7 +91,7 @@ mergeRefs = Foldable.foldr1 merge
         , xrefImports = xrefImports a ++ xrefImports b
         }
 
-analyiseFullPath :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)
+analyiseFullPath :: GhcMonad m => FilePath -> ReaderT TestEnv IO (NonEmpty (m XRef))
 analyiseFullPath f = do
     baseGhcArgs <- asks testDefaultGhcArgs
     let ghcArgs = baseGhcArgs { gaArgs = [f] }

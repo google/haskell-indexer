@@ -208,10 +208,13 @@ makeRelationFacts (Relation src relKind target) =
            --   out of Kythe-related tools that are not aware of Haskell.
 
 -- | Makes fact about module imports.
-makeImportFacts :: Import -> Conversion [Raw.Entry]
-makeImportFacts Import{..} = do
-    targetVname <- tickVName importTick
-    makeAnchor (tickSpan importTick) RefImportsE targetVname Nothing Nothing
+makeImportFacts :: ModuleTick -> Conversion [Raw.Entry]
+makeImportFacts ModuleTick{..} = do
+    vn <- asks baseVName
+    makeAnchor mtSpan RefImportsE (pkgvn vn) Nothing Nothing
+  where
+    moduleSig = (getPackage mtPkgModule) <> ":" <> (getModule mtPkgModule)
+    pkgvn v = v { vnSignature = moduleSig }
 
 -- Helpers below.
 
