@@ -557,7 +557,7 @@ importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
     extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
     extractPkgModule name = do
       m <- findModule name Nothing
-      let pkg = T.pack . packageKeyString . modulePackageKey $ m
+      let pkg = T.pack . showPackageName . moduleUnitId $ m
       let mName = T.pack . moduleNameString . moduleName $ m
       return $ PkgModule pkg mName
 
