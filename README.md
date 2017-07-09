@@ -4,7 +4,18 @@ for emitting entities for the [Kythe](https://kythe.io) indexing schema.
 
 This is not an official Google product.
 
-# Installation (Linux)
+# Supported systems
+
+Indexing hosts:
+ - Linux: supported - follow below documentation.
+ - Windows, MacOS: didn't try - backend part likely compiles, wiring and Kythe frontend likely not (see #38).
+
+Compilers:
+  - GHC 7.10.3, 8.0.1, 8.0.2
+  
+[![Build Status](https://travis-ci.org/google/haskell-indexer.svg?branch=master)](https://travis-ci.org/google/haskell-indexer)
+
+# Installation
 
 ## Stack
 
@@ -44,24 +55,33 @@ Use the following to build and run tests:
 ```
 git clone --recursive https://github.com/google/haskell-indexer.git
 cd haskell-indexer
-stack build
+# 8.17 -> GHC 8.0.2
+# 6.30 -> GHC 7.10.3
+export STACK_YAML=$(readlink -f stack-8.17.yaml)
+stack build && stack test
+# To test Kythe frontend:
+pushd kythe-verification; stack install && ./test.sh; popd
 ```
 
 # Demo
 
-To index a few packages and serve the index, run:
+To index a few packages, run:
 
-```
+```bash
 ./build-stack.sh /tmp/logs mtlparse cpu
 ```
 
-The script temporarily replaces the system GHC with
-`wrappers/stack-docker/fake-stack/ghc` script, does the indexing and serves the
-built index at `localhost:8080`.
+The script adds a wrapper for the GHC compiler used by Stack (`stack path --compiler-exe`), does the indexing when `ghc --make` is specified on the command line to build a package. You can run `build-stack.sh` multiple times.
+
+To serve the index at `http://localhost:8080`:
+
+```bash
+./serve.sh /tmp/logs localhost:8080
+```
 
 If you get empty index, look at `/tmp/logs/*.stderr` files about possible
-indexing errors. Also make sure that you `/tmp/logs/*.entries` files are not
-empty. If they are, there was some trouble with indexing.
+indexing errors. Also, make sure that your `/tmp/logs/*.entries` files are not
+empty. If they are, it indicates that `ghc_kythe_wrapper` failed to index.
 
 ## Indexing using Docker
 
@@ -73,5 +93,5 @@ section.
 
 The docker image has all C library dependencies so it's possible to use it to
 index the whole Stackage snapshot. See `stack-build-docker.sh` for a
-comprehensive example of indexing a stackage snapshot, and serving a Kythe
+comprehensive example of indexing a Stackage snapshot, and serving a Kythe
 index.

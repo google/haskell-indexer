@@ -1,8 +1,10 @@
 name:                haskell-indexer-backend-ghc
 version:             0.1.0.0
 synopsis:            Indexing code using GHC API.
+description:         See README.md.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
+license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          robinpalotai@google.com
 copyright:           Google Inc.

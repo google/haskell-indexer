@@ -94,7 +94,8 @@ prettyDecls :: [Decl] -> String
 prettyDecls ds = L.intercalate "\n" (map prettyDecl ds) ++ "\n"
 
 prettyDecl :: Decl -> String
-prettyDecl decl = "Decl {type: " ++ show (declQualifiedType $ declType decl)
+prettyDecl decl = "Decl { name: " ++ show (tickThing $ declTick decl)
+                  ++ ", type: " ++ show (declQualifiedType $ declType decl)
                                  ++ pos
                   ++ ", extra: " ++ show (declExtra decl)
                                  ++ "}"
@@ -185,7 +186,10 @@ hasRelation k s t = do
 refContextIs :: (MonadIO m) => Decl -> TickReference -> m ()
 refContextIs decl tr =
     unless (refHighLevelContext tr == Just (declTick decl)) $ failConcat
-        [ "Reference context of ", prettyReference tr, " doesn't match ", prettyDecl decl ]
+        [ "Reference context of ", prettyReference tr, " doesn't match ", prettyDecl decl
+        , " having tick ", show (declTick decl)
+        , ", instead matches ", show (refHighLevelContext tr)
+        ]
 
 userFriendlyTypeIs :: (MonadIO m) => Text -> Decl -> m ()
 userFriendlyTypeIs t decl =

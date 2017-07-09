@@ -1,8 +1,10 @@
 name:                kythe-schema
 version:             0.1.0.0
 synopsis:            Library for emitting Kythe schema entries.
+description:         See README.md.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
+license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          robinpalotai@google.com
 copyright:           Google Inc.
@@ -21,7 +23,7 @@ library
                      , data-default
                      , kythe-proto
                      , lens-family
-                     , proto-lens == 0.1.*
+                     , proto-lens >= 0.1
                      , proto-lens-combinators == 0.1.*
                      , text
   default-language:    Haskell2010

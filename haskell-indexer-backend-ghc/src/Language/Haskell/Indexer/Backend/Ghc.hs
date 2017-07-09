@@ -16,6 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 {-| Converts GHC typechecked AST into intermediate Analysed format.
 
 This module should not assume anything about the backend consuming the
@@ -35,7 +36,14 @@ import qualified Name as GHC
 import FastString (unpackFS)
 import GHC
 import qualified Id as GHC
+#if __GLASGOW_HASKELL__ >= 800
+import Module (unitIdString)
+import ConLike (ConLike(..))
+import HsPat (HsRecField(..))
+import HsTypes (AmbiguousFieldOcc(..))
+#else
 import Module (packageKeyString, modulePackageKey)
+#endif
 import Name (nameModule_maybe, nameOccName)
 import qualified Outputable as GHC
 import OccName (occNameString)
@@ -45,9 +53,10 @@ import Var (Var, varName, varType)
 import Control.Arrow (second)
 import Control.Monad (guard)
 import Data.Bool (bool)
+import Data.Data (Data)
 import Data.Either (partitionEithers)
 import Data.Function (on)
-import Data.List (partition, sortBy, groupBy)
+import Data.List (partition, sortBy, groupBy, (\\))
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
 import Data.Monoid ((<>))
@@ -56,6 +65,7 @@ import Data.Reflection (Given, give, given)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -88,6 +98,17 @@ data ExtractCtx = ExtractCtx
     , ecGhcEnv     :: !GhcEnv
     , ecOptions    :: !AnalysisOptions
     }
+
+#if __GLASGOW_HASKELL__ >= 800
+showPackageName :: UnitId -> String
+showPackageName = unitIdString
+mayUnLoc = unLoc
+#else
+showPackageName :: PackageKey -> String
+showPackageName = packageKeyString
+moduleUnitId = modulePackageKey
+mayUnLoc = id
+#endif
 
 analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModule -> m XRef
 analyseTypechecked ghcEnv opts tm = do
@@ -188,18 +209,62 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         (instDefs, instChanges) = second M.unions . unzip . mapMaybe instDecls
                                 . hs_instds
                                 $ hsGroup
+#if __GLASGOW_HASKELL__ >= 800
+        explicitVarBindDefs = map mkDeclName explicitNames
+    in (concat [defs, instDefs, explicitVarBindDefs, implicitVarBindDefs], instChanges)
+#else
         varBindDefs = concatMap declsFromForall . universeBi $ hsGroup
-        -- TODO(robinpalotai): emit DeclMods for type signatures, so the later
-        --   extracted decls can carry them.
     in (concat [defs, instDefs, varBindDefs], instChanges)
+#endif
   where
+    keepFirst [] = Nothing
+    keepFirst xs@((name, _):_) = Just $! (name, minimum $ map snd xs)
+#if __GLASGOW_HASKELL__ >= 800
+    mkDeclName n = nameDeclAlt ctx n Nothing typeStringyType
+    explicitNames = concatMap namesFromForall . universeBi $ hsGroup
+    implicitVarBindDefs =
+        let -- Collect the usages so we can assign a binding at the first usage.
+            -- Note: we could also just omit the location, making it an implicit
+            -- decl. Or put the location as an alternate span.
+            allUsages = mapMaybe nameFromTyVar . universeBi $ hsGroup
+            firstUsages = mapMaybe keepFirst
+                . groupBy ((==) `on` fst)
+                . sortBy (comparing fst)
+                . map fromLoc
+                $ allUsages
+            implicitDefs = Set.fromList . concat $
+                [ concatMap namesFromHsIbSig . universeBi $ hsGroup
+                , concatMap namesFromHsIbWc . universeBi $ hsGroup
+                , concatMap namesFromHsWC . universeBi $ hsGroup
+                ]
+        in map mkDecl . filter (\(n,_) -> Set.member n implicitDefs)
+           $ firstUsages
+      where
+        mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
+        fromLoc (L l n) = (n, l)
+        --
+        nameFromTyVar :: HsType Name -> Maybe (Located Name)
+        nameFromTyVar (HsTyVar n) = Just $! n
+        nameFromTyVar _ = Nothing
+        namesFromHsIbWc :: LHsSigWcType Name -> [Name]
+        namesFromHsIbWc (HsIB names _) = names
+        namesFromHsIbSig :: LHsSigType Name -> [Name]
+        namesFromHsIbSig (HsIB names _) = names
+        namesFromHsWC :: LHsWcType Name -> [Name]
+        namesFromHsWC (HsWC names _ _) = names
+    --
+    namesFromForall :: HsType Name -> [Name]
+    namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
+      where
+        mkDecl binder =
+          nameDeclAlt ctx (hsLTyVarName binder) Nothing typeStringyType
+    namesFromForall _ = []
+#else
     -- Getting the location of implicit variable bindings is tricky, as the
     -- HsTyVarBndr's location is the whole span of the scope, at least for the
     -- HsForAllTy. The actual location is harvested from the usage
     -- locations, ideally from the one which occurs first by location.
-    -- TODO(robinpalotai): it seems a bit dodgy that the first usage emits
-    -- both the declaration and the usage. The decl should go to some virtual
-    -- location / figment.
+    -- See above note about just omitting the span for the decl.
     declsFromForall :: HsType Name -> [DeclAndAlt]
     declsFromForall (HsForAllTy explicitness _ binders context ty) =
         -- TODO(robinpalotai): a kind signature will include the kind in the
@@ -209,18 +274,18 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             Explicit -> map (mkDecl . unLoc) . hsq_tvs $ binders
               where
                 mkDecl binder =
-                    nameDeclAlt ctx (boundTyVarName binder) Nothing
+                    nameDeclAlt ctx (hsTyVarName binder) Nothing
                                 typeStringyType
             Implicit  -> implicitCase
             Qualified -> implicitCase
-                -- ^ Quoting Note [HsForAllTy tyvar binders]:
+                -- Quoting Note [HsForAllTy tyvar binders]:
                 --
                 -- "Qualified currently behaves exactly as Implicit, but it is
                 -- deprecated to use it for implicit quantification."
       where
         implicitCase =
             let boundTyVarNames = Set.fromList
-                                . map (boundTyVarName . unLoc) . hsq_tvs
+                                . map (hsTyVarName . unLoc) . hsq_tvs
                                 $ binders
                 usages = mapMaybe (interestingNameToLoc boundTyVarNames)
                        . universeBi
@@ -237,33 +302,47 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             | Set.member n s = Just $! (n, loc)
             | otherwise = Nothing
         interestingNameToLoc _ _ = Nothing
-        keepFirst [] = Nothing
-        keepFirst xs@((name, _):_) = Just $! (name, minimum $ map snd xs)
     declsFromForall _ = []
+#endif
     -- | For typevar binders directly attached to datatype declarations (like
     -- data, type, class etc), the location of the name is correctly set to
     -- the span of the type variable.
     -- TODO(robinpalotai): as in declsFromForall about stripping kind signature
     --   from span.
+#if __GLASGOW_HASKELL__ >= 800
+    hsqShim = hsq_explicit
+    declsFromDataBinders :: LHsQTyVars Name -> [DeclAndAlt]
+#else
+    hsqShim = hsq_tvs
     declsFromDataBinders :: LHsTyVarBndrs Name -> [DeclAndAlt]
-    declsFromDataBinders = map (mkDecl . boundTyVarName . unLoc) . hsq_tvs
+#endif
+    declsFromDataBinders = map (mkDecl . hsTyVarName . unLoc) . hsqShim
       where
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
-    boundTyVarName :: HsTyVarBndr id -> id
-    boundTyVarName = \case
-        UserTyVar n -> n
+    hsTyVarName :: HsTyVarBndr id -> id
+    hsTyVarName = \case
+        UserTyVar n -> mayUnLoc n
         KindedTyVar n _ -> unLoc n
     -- Datatypes.
-    dataDecls (L _ (DataDecl locName binders defn _)) =
+#if __GLASGOW_HASKELL__ >= 800
+    dataDecls (L _ (DataDecl locName binders defn _ _)) =
+#else
+    dataDecls (L _ (DataDecl locName binders defn _ )) =
+#endif
         let top = dataCtorLikeDecl locName
             ctors = map (conDecls . unLoc) . dd_cons $ defn
             tyvars = declsFromDataBinders binders
         in top:(ctors ++ tyvars)
       where
+#if __GLASGOW_HASKELL__ >= 800
+        conDecls cd@(ConDeclH98 conLName _ _ _ _) =
+            dataLikeDecl cd conLName
+        conDecls cd@(ConDeclGADT conLNames _ _) =
+            dataLikeDecl cd (head conLNames)  -- TODO(robinp): all ctors
+#else
         conDecls cd@(ConDecl conLNames _ _ _ _ _ _ _) =
-            -- There should always be at least one constructor name. Ignore all
-            -- but the first for now.
-            dataLikeDecl cd (head conLNames)
+            dataLikeDecl cd (head conLNames)  -- TODO(robinp): all ctors
+#endif
     -- Type aliases.
     dataDecls (L _ sd@(SynDecl locName binders _ _)) =
         -- For type aliases we use 'dataLikeDecl' to render the full definition
@@ -278,7 +357,12 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             fromSigs = concatMap (sigDecls . unLoc) sigs
         in top:(fromSigs ++ tyvars)
       where
+#if __GLASGOW_HASKELL__ >= 800
+        sigDecls (TypeSig lnames ty) = map (dataLikeDecl ty) lnames
+        sigDecls (ClassOpSig _ lnames ty) = map (dataLikeDecl ty) lnames
+#else
         sigDecls (TypeSig lnames ty _) = map (dataLikeDecl ty) lnames
+#endif
         -- TODO(robinpalotai): others?
         sigDecls _ = []
     -- Other
@@ -295,7 +379,6 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         --    methods are present in the typechecked source (will emit there).
         --    But we emit an identifier override for the methods so they show
         --    up nice in the call-chain.
-        --    Note: we don't emit a displayName override, but maybe we could.
         splitType <- mySplitInstanceType lty
         let niceInstIdentifier = T.pack
                                . filterInstanceName
@@ -317,7 +400,11 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
                                      $ lbinds
           where
             renameInstanceMethod = \case
+#if __GLASGOW_HASKELL__ >= 800
+                (FunBind funName _ _ _ _) ->
+#else
                 (FunBind funName _ _ _ _ _) ->
+#endif
                     let key = makeInstanceMethodTick ctx funName
                         change = MethodForInstance instIdentifier
                     in M.singleton key change
@@ -343,18 +430,26 @@ data SplitInstType = SplitInstType
       -- ^ The location is properly set to the span of 'Cls Inst'
     }
 
+#if __GLASGOW_HASKELL__ >= 800
+mySplitInstanceType :: LHsSigType Name -> Maybe SplitInstType
+mySplitInstanceType ty = do
+    let (_, body) = GHC.splitLHsForAllTy (hsSigType ty)
+    clsName <- getLHsInstDeclClass_maybe ty
+    Just $! SplitInstType
+        { onlyClass = unLoc clsName
+        , classAndInstance = body
+        }
+#else
 mySplitInstanceType :: LHsType Name -> Maybe SplitInstType
 mySplitInstanceType ty = do
-    (_, _, L clsL clsName, instLTys)
-        <- GHC.splitLHsInstDeclTy_maybe ty
-    -- Could get this directly if splitLHsForAllTy was exported.
-    -- See https://ghc.haskell.org/trac/ghc/ticket/11229.
+    (_, _, L clsL clsName, instLTys) <- GHC.splitLHsInstDeclTy_maybe ty
     let clsInstTy = GHC.mkHsAppTys (L clsL (HsTyVar clsName)) instLTys
         combinedLoc = foldr (combineSrcSpans . getLoc) clsL instLTys
     Just $! SplitInstType
         { onlyClass = clsName
         , classAndInstance = L combinedLoc clsInstTy
         }
+#endif
 
 -- | Gets the span of the "instance" keyword of a typeclass instance
 -- definition. Assumes the argument span starts at the "instance" keywork -
@@ -371,16 +466,16 @@ makeInstanceTick ctx splitType = Tick
     , tickThing = T.pack . filterInstanceName $!
           ghcPrintUnqualified (ecGhcEnv ctx)
                               (unLoc $ classAndInstance splitType)
-      -- ^ Unlike Purescript, instances don't have a name by default, so
+      -- Unlike Purescript, instances don't have a name by default, so
       -- we invent one that should be unique in the module.
     , tickSpan = give ctx ((srcSpanToSpan . getLoc . classAndInstance) splitType)
     , tickUniqueInModule = False
-      -- ^ Could be True, but let's keep False, which is more in line with
-      -- AST.
+      -- Could be True, but let's keep False, which is more in line with AST.
     , tickTermLevel = False
     }
 
--- | Collects type-level references.
+-- | Collects type-level references. These visibly appear in type signatures,
+-- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
 refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
@@ -399,13 +494,17 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         -- Basic variable at the leaves of type trees.
         -- Not only "real" type variables, but also type-level terms like
         -- specific types, type aliases etc.
-        HsTyVar n -> give ctx (nameLocToRef n Ref l)
+        HsTyVar n -> give ctx (nameLocToRef (mayUnLoc n) Ref l)
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
 
     refsFromSignature :: LSig Name -> [Reference]
     refsFromSignature (L _ sig) = case sig of
+#if __GLASGOW_HASKELL__ >= 800
+        TypeSig names _ ->
+#else
         TypeSig names _ _ ->
+#endif
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
         _ -> []
 
@@ -423,7 +522,11 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         _ -> []
       where
         methodOverride = \case
+#if __GLASGOW_HASKELL__ >= 800
+            (FunBind clsFunName _ _ _ _) ->
+#else
             (FunBind clsFunName _ _ _ _ _) ->
+#endif
                 let clsFunTick = nameInModuleToTick ctx (unLoc clsFunName)
                     instFunTick = makeInstanceMethodTick ctx clsFunName
                 in Just $! Relation instFunTick ImplementsMethod clsFunTick
@@ -492,13 +595,22 @@ partitionTopLevelBindsByMatchGroupOrigin =
     partition (isFromSource . unLoc) . GHC.bagToList
   where
     isFromSource = \case
-        FunBind _ _ mg _ _ _ -> not . GHC.isGenerated . mg_origin $ mg
-        AbsBinds _ _ _ _ binds ->
+#if __GLASGOW_HASKELL__ >= 800
+        FunBind _ mg _ _ _ ->
+#else
+        FunBind _ _ mg _ _ _ ->
+#endif
+            not . GHC.isGenerated . mg_origin $ mg
+        AbsBinds _ _ _ _ binds -> goAbs binds
             -- Practically there will be a FunBind below which holds the truth.
             -- Except typeclass instance methods, which will have an extra
             -- layer of AbsBinds, but the recursion takes care of that.
-            null . snd . partitionTopLevelBindsByMatchGroupOrigin $ binds
+#if __GLASGOW_HASKELL__ >= 800
+        AbsBindsSig _ _ _ _ _ bind -> goAbs (GHC.unitBag bind)
+#endif
         _ -> True
+    --
+    goAbs = null . snd . partitionTopLevelBindsByMatchGroupOrigin
 
 declsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclMods
                      -> [DeclAndAlt]
@@ -509,7 +621,7 @@ declsFromTypechecked ctx tsrc instDeclMods =
             . partitionInstanceAbsBinds
             $ src
         -- Skip compiler-generated bodies, just extract the top-level def.
-        generated = declsFromHsBinds ctx gen
+        generated = declsFromHsBinds ctx . map (ParentChild Nothing) $ gen
     in fromRegularSrc ++ modifyDecls fromInstanceSrc ++ generated
   where
     modifyDecls = map (mapDeclAndAlt (modifyDecl instDeclMods))
@@ -517,7 +629,7 @@ declsFromTypechecked ctx tsrc instDeclMods =
 -- | Emits function declarations and pattern variables.
 deepDeclsFromTopBind :: ExtractCtx -> LHsBindLR Id Id -> [DeclAndAlt]
 deepDeclsFromTopBind ctx top =
-    let hsbDecls = declsFromHsBinds ctx (universe top)
+    let hsbDecls = declsFromHsBinds ctx (universeWithParents top)
         -- ^ Warning, target type same as source, use universe (not Bi).
         patDecls = mapMaybe declsFromPat . universeBi $ top
     in hsbDecls ++ patDecls
@@ -526,58 +638,98 @@ deepDeclsFromTopBind ctx top =
     declsFromPat (L _ p) = case p of
         -- Eventually every interesting pattern ends in some variable capturing
         -- patterns.
-        VarPat v -> Just $! varDecl v
+        VarPat v -> Just $! varDeclNoAlt (mayUnLoc v)
         -- Below are special patterns that declare things outside an LPat, so
         -- universe traversal wouldn't capture them. We emit declarations for
         -- these special things (Pats are taken care by above case).
-        AsPat (L _ asVar) _ -> Just $! varDecl asVar
+        AsPat (L _ asVar) _ -> Just $! varDeclNoAlt asVar
         -- Universe covers the rest.
         _ -> Nothing
       where
-        varDecl v = varDeclAlt ctx v Nothing
+        varDeclNoAlt v = varDeclAlt ctx v Nothing
+
+-- | Glorified pair.
+data SureParentChild a = SureParentChild !a !a
+
+-- | Convenience for having the children bundled up with the parent.
+childrenWithParent :: (Data a, Typeable a) => a -> [SureParentChild a]
+childrenWithParent a = map (SureParentChild a) (children a)
+
+data ParentChild a = ParentChild
+  { pcParent :: !(Maybe a)
+  , pcChild :: !a
+  }
+
+-- | Like 'universe', but serves the elements along with their nearest ancestor
+-- of the same type. The top element will be returned too, but without a parent.
+universeWithParents :: (Data a, Typeable a) => a -> [ParentChild a]
+universeWithParents a = ParentChild Nothing a : go a
+  where
+    go a = let cs = children a
+           in map (ParentChild (Just $! a)) cs ++ concatMap go cs
+
 
 -- | Function declarations from the bindings.
 --
--- There can be overlapping binds in the input, specifically complicated
--- bindings can have both abstraction and function bindings (see
--- 'absFunDeclsFromHsBind'). This is handled by deduping on the monomorphic
--- identifier. In case of such overlap, the declaration returned is based on the
--- polymorphic binding, since it has richer type.
+-- There can be overlapping binds in the input, specifically some
+-- bindings can have both abstraction and function bindings. So we check for
+-- these Abs+Fun bindings, and only emit the polymorphic binding from
+-- the Abs, and retarget the monomorphic references to point to the polymorphic.
+--
+-- Note: normally recursive calls target the monomorphic bind, except if the
+-- function has a type signature.
 --
 -- Note: Typechecked fundecls contain record accessors, but not data
 -- constructors - latter are exported from the renamed source.
-declsFromHsBinds :: ExtractCtx -> [LHsBind Id] -> [DeclAndAlt]
-declsFromHsBinds ctx binds =
-    let (abss, funs) = partitionEithers
-                     . concatMap (absFunDeclsFromHsBind ctx)
-                     $ binds
-        -- FunBind will have the same funVar as the monomorphic binding of the
-        -- AbsBind (if there's a corresponding AbsBind).
-        absMonoTicks = mapMaybe daAlt abss
-        funOnlys = filter (not . hasTick absMonoTicks) funs
-    in map (flip DeclAndAlt Nothing) funOnlys ++ abss
+declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind Id)] -> [DeclAndAlt]
+declsFromHsBinds ctx = concatMap go
   where
-    hasTick :: [Tick] -> Decl -> Bool
-    hasTick ts decl = (declTick decl ==) `any` ts
+    go (ParentChild Nothing a) = absFunDeclsFromHsBind ctx a
+    go (ParentChild (Just p) c) =
+        if unLoc c `funUnderAbs` unLoc p
+            then []
+            else absFunDeclsFromHsBind ctx c
+      where
+#if __GLASGOW_HASKELL__ >= 800
+        funUnderAbs (FunBind _ _ _ _ _) p
+#else
+        funUnderAbs (FunBind _ _ _ _ _ _) p
+#endif
+            | isAbs p = True
+
+          where
+            isAbs = \case
+                AbsBinds _ _ _ _ _ -> True
+#if __GLASGOW_HASKELL__ >= 800
+                AbsBindsSig _ _ _ _ _ _ -> True
+#endif
+                _ -> False
+        funUnderAbs _ _ = False
 
 -- | Extracts both AbsBinds and FunBinds. The separation is needed since
 -- deduping is required upstream.
 absFunDeclsFromHsBind
     :: ExtractCtx -> LHsBind Id
-    -> [Either DeclAndAlt Decl]
+    -> [DeclAndAlt]
 absFunDeclsFromHsBind ctx (L _ b) = case b of
-    FunBind (L idLoc funVar) _ _ _ _ _  ->
-        let declType = outputableStringyType ctx (varType funVar)
-            decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
-                             (nameDecl ctx (varName funVar) declType)
-        in [Right decl]
+#if __GLASGOW_HASKELL__ >= 800
+    FunBind (L idLoc funVar) _ _ _ _ ->
+#else
+    FunBind (L idLoc funVar) _ _ _ _ _ ->
+#endif
+        let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
+                             (varDecl ctx funVar)
+        in [DeclAndAlt decl Nothing]
     AbsBinds _ _ exports _ _ ->
-        mapMaybe abeVar exports
-          where
-            abeVar abe = do
-                guard . not . isInstanceMethodVar . abe_poly $ abe
-                Just $! Left $! varDeclAlt ctx (abe_poly abe)
-                                               (Just $ abe_mono abe)
+        map abeVar . filter (not . isInstanceMethodVar . abe_poly) $ exports
+      where
+        abeVar abe = varDeclAlt ctx (abe_poly abe) (Just $ abe_mono abe)
+#if __GLASGOW_HASKELL__ >= 800
+    AbsBindsSig _ _ export _ _ _ ->
+        if not (isInstanceMethodVar export)
+           then [varDeclAlt ctx export Nothing]
+           else []
+#endif
     _ ->
         -- TODO(robinpalotai): anything to do here?
         []
@@ -606,6 +758,10 @@ varDeclAlt :: ExtractCtx -> Var -> Maybe Var -> DeclAndAlt
 varDeclAlt ctx v alt =
     nameDeclAlt ctx (varName v) (FromName . varName <$> alt)
                 (outputableStringyType ctx (varType v))
+
+-- | Like nameDecl but for Vars.
+varDecl :: ExtractCtx -> Var -> Decl
+varDecl ctx v = nameDecl ctx (varName v) (outputableStringyType ctx (varType v))
 
 -- | Defines how to produce an alternate reference target.
 data AlternateRefTarget
@@ -701,6 +857,11 @@ instanceAbsBinds = \case
     (L _ (AbsBinds _ _ exports _ binds))
         | (isInstanceMethodVar . abe_poly) `any` exports ->
             Just $! GHC.bagToList binds
+#if __GLASGOW_HASKELL__ >= 800
+    (L _ (AbsBindsSig _ _ export _ _ bind))
+        | isInstanceMethodVar export ->
+            Just $! [bind]
+#endif
     _ -> Nothing
 
 -- | Pulls the AbsBinds below the top one up (if typeclass instance method), or
@@ -715,11 +876,12 @@ partitionInstanceAbsBinds
   where
     instToRight b = maybe (Left [b]) Right . instanceAbsBinds $ b
 
+-- | Gathers term-level references.
 refsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclAltMap
                     -> [TickReference]
 refsFromTypechecked ctx tsrc declAlts =
     let sourceBasedBinds = fst (partitionTopLevelBindsByMatchGroupOrigin tsrc)
-    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= children
+    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= childrenWithParent
            >>= refsFromBelowTop
     -- TODO(robinpalotai): sort out what happens to files in these spans if
     --   there is a preprocessor.
@@ -736,12 +898,24 @@ refsFromTypechecked ctx tsrc declAlts =
     -- suitable - practically FunBind is suitable, PatBind is usually not,
     -- since it is not obvious which part of the pattern should we attribute
     -- references to.
-    refsFromBelowTop (L _ subBind) =
+    refsFromBelowTop (SureParentChild (L _ parent) (L _ subBind)) =
         let exprRefs = concatMap refsFromExpr . universeBi $ subBind
             (patRefs, redirs) = unzip . map refsFromPat . universeBi $ subBind
             refContextTick = case subBind of
-                FunBind (L _ declRef) _ _ _ _ _ -> Just $!
-                    nameInModuleToTick ctx (varName declRef)
+#if __GLASGOW_HASKELL__ >= 800
+                FunBind (L _ declRef) _ _ _ _ -> case parent of
+#else
+                FunBind (L _ declRef) _ _ _ _ _ -> case parent of
+#endif
+                    -- Note: AbsBindsSig doesn't expose the monomorphic binding,
+                    -- so we can't easily retarget, but the internal FunBind's
+                    -- name is still monomorphic.
+#if __GLASGOW_HASKELL__ >= 800
+                    AbsBindsSig _ _ poly _ _ _ ->
+                        Just $! nameInModuleToTick ctx (varName poly)
+#endif
+                    _ ->
+                        Just $! nameInModuleToTick ctx (varName declRef)
                 _ -> Nothing
         in map (toTickReference ctx refContextTick declAlts)
                (postprocess (concat redirs) exprRefs ++ concat patRefs)
@@ -788,7 +962,7 @@ refsFromTypechecked ctx tsrc declAlts =
                 -- TODO(robinpalotai): follow a whitelisted chain of
                 --   decorative patterns (BangPat, ParPat etc) too.
                 L _ (VarPat var) -> Just $!
-                    mkRedirect (varName var) (recordFieldName f)
+                    mkRedirect (varName $ mayUnLoc var) (recordFieldName f)
                 -- TODO(robinpalotai): could emit a reference from the span
                 --   of the complex pattern match too, probably marking it
                 --   so frontends that don't handle the overlap well can
@@ -808,12 +982,12 @@ refsFromTypechecked ctx tsrc declAlts =
     refsFromExpr (L l x) = case x of
         -- Eventually all interesting value references point to a variable.
         HsVar vid ->
-            let n = case specialVar vid of
+            let n = case specialVar (mayUnLoc vid) of
                     -- See notes in DataCon.hs. We exported the declaration
                     -- from the renamed source, which has the name of the
                     -- DataCon.
                     Just (DataConWorkerWrapperSV dc) -> GHC.dataConName dc
-                    _ -> varName vid
+                    _ -> varName (mayUnLoc vid)
             in maybeToList (give ctx (nameLocToRef n Ref l))
         -- Special handling for call-like expressions. We emit an extra ref
         -- with kind Call, then the duplicate Ref produced by the HsVar match
@@ -828,8 +1002,14 @@ refsFromTypechecked ctx tsrc declAlts =
         -- Note: What is an EAsPat, and what is its first id?
         --
         HsWrap _ e -> refsFromExpr (L l e)
+#if __GLASGOW_HASKELL__ >= 800
+        RecordCon locDataConId _ _ r -> recordConRefs locDataConId r
+        -- TODO(robinp): emit ref to all the possible constructors (also below).
+        RecordUpd _ r (RealDataCon dc:_) _ _ _   -> recordUpdRefs dc r
+#else
         RecordCon locDataConId _ r -> recordConRefs locDataConId r
-        RecordUpd _ r (dc:_) _ _   -> recordUpdRefs dc r 
+        RecordUpd _ r (dc:_) _ _   -> recordUpdRefs dc (rec_flds r)
+#endif
         -- Others handled by universe.
         _ -> []
       where
@@ -846,20 +1026,39 @@ refsFromTypechecked ctx tsrc declAlts =
         -- The same-named fields of different datacons are actually just a
         -- single field, so it's ok to pass in an arbitrary DataCon to mine
         -- for reference targets.
-        recordUpdRefs dataCon r =
+#if __GLASGOW_HASKELL__ >= 800
+        recordUpdRefs :: DataCon -> [LHsRecUpdField Id] -> [Reference]
+#else
+        recordUpdRefs :: DataCon -> [LHsRecField Id (LHsExpr Id)] -> [Reference]
+#endif
+        recordUpdRefs dataCon =
             let fieldNames = GHC.dataConFieldLabels dataCon
-                fieldRefs = concatMap (recordFieldRefs fieldNames)
-                          . map (ExplicitAssignedRF,)
-                          . map unLoc
-                          . rec_flds
-                          $ r
-            in fieldRefs
-        -- See comments on 'Redirect' about how this should be in the future.
+            in concatMap (recordFieldRefs fieldNames)
+                . map (
+                      (ExplicitAssignedRF,)
+#if __GLASGOW_HASKELL__ >= 800
+                        -- We are in Typechecked tree, where ambiguities
+                        -- are already resolved. This is safe.
+                        . (\(HsRecField a b c) -> HsRecField
+                            (unambiguousFieldOcc <$> a) b c)
+#endif
+                        . unLoc
+                      )
+      -- See comments on 'Redirect' about how this should be in the future.
+#if __GLASGOW_HASKELL__ >= 800
+        recordFieldRefs
+            :: [GHC.FieldLabel] -> (RecFieldCat, HsRecField Id (LHsExpr Id))
+            -> [Reference]
+        recordFieldRefs fieldLabels (cat, f) =
+            let fieldNames = map GHC.flSelector fieldLabels
+                fieldMap = M.fromList (fieldNames `zip` fieldNames)
+#else
         recordFieldRefs
             :: [Name] -> (RecFieldCat, HsRecField Id (LHsExpr Id))
             -> [Reference]
         recordFieldRefs fieldNames (cat, f) =
             let fieldMap = M.fromList (fieldNames `zip` fieldNames)
+#endif
                 -- For some reason the name in the hsRecFieldId has the span
                 -- differently set compared to the datacon field, but the
                 -- uniq is the same so name equality will work.
@@ -884,12 +1083,13 @@ refsFromTypechecked ctx tsrc declAlts =
                     --   exprs that still have a single var at the leaf.
                     --   Not sure it can happen, test on AST.
                     L _ (HsVar v) -> give ctx $
-                        nameLocToRef target Ref (nameSrcSpan . varName $ v)
+                        nameLocToRef target Ref
+                                     (nameSrcSpan . varName . mayUnLoc $ v)
                     _ -> Nothing
         callRef (L appl e) = case e of
             -- Base case, but practically not occuring directly.
             HsVar v -> maybeToList $
-                give ctx (nameLocToRef (varName v) Call appl)
+                give ctx (nameLocToRef (varName (mayUnLoc v)) Call appl)
             -- After typechecking this happens in practice.
             HsWrap _ expr -> callRef (L appl expr)
             -- The AST omits parens if precedence doesn't require them, but
@@ -1011,8 +1211,8 @@ extractModuleName :: ExtractCtx -> Module -> PkgModule
 extractModuleName ctx m =
     let opts = ecOptions ctx
         ps = aoDemanglePackageName opts . T.pack
-           . packageKeyString
-           . modulePackageKey
+           . showPackageName
+           . moduleUnitId
            $ m
         ms = (T.pack . moduleNameString . moduleName) m
         p = if ps == "main" then aoMainPkgFallback opts <> "_main" else ps

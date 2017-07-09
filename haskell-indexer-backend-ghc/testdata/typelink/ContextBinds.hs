@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 module ContextBinds where
 
-foo :: Eq a => a
+foo :: Eq c => c
 foo = undefined
 
 bar :: (Eq a, a ~ b) => b

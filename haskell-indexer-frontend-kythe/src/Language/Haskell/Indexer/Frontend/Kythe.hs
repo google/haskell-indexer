@@ -201,11 +201,11 @@ makeRelationFacts (Relation src relKind target) =
     edgeKinds = case relKind of
          ImplementsMethod  -> [OverridesE, OverridesRootE]
          InstantiatesClass -> [ExtendsE]
-           -- ^ Note: In Haskell-terms, class instantiation is not extension
-           --   (or subclassing), but in Kythe terms we can think of the class
-           --   as an interface, and the instance as the implementation.
-           --   So by squinting a bit, we'll hopefully get better functionality
-           --   out of Kythe-related tools that are not aware of Haskell.
+           -- Note: In Haskell-terms, class instantiation is not extension
+           -- (or subclassing), but in Kythe terms we can think of the class
+           -- as an interface, and the instance as the implementation.
+           -- So by squinting a bit, we'll hopefully get better functionality
+           -- out of Kythe-related tools that are not aware of Haskell.
 
 -- | Makes fact about module imports.
 makeImportFacts :: ModuleTick -> Conversion [Raw.Entry]
