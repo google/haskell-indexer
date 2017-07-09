@@ -68,13 +68,13 @@ assertXRefsFrom f asserts = do
     liftIO (runReaderT asserts xref)
 
 -- | Analyses a test file relative to the 'data' directory.
-analyse :: GhcMonad m => FilePath -> ReaderT TestEnv IO (NonEmpty (m XRef))
+analyse :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)
 analyse dataRelative = do
     fullPath <- (</> dataRelative) <$> asks testDataDirectory
     analyiseFullPath fullPath
 
 -- | Convenience for disregarding the source file of reference data.
-analyseAndMerge :: GhcMonad m => FilePath -> ReaderT TestEnv IO (m XRef)
+analyseAndMerge :: FilePath -> ReaderT TestEnv IO XRef
 analyseAndMerge = fmap mergeRefs . analyse
 
 -- | Merges with terrible list concat performance, keeps an arbitrary file
@@ -91,19 +91,17 @@ mergeRefs = Foldable.foldr1 merge
         , xrefImports = xrefImports a ++ xrefImports b
         }
 
-analyiseFullPath :: GhcMonad m => FilePath -> ReaderT TestEnv IO (NonEmpty (m XRef))
+analyiseFullPath :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)
 analyiseFullPath f = do
     baseGhcArgs <- asks testDefaultGhcArgs
     let ghcArgs = baseGhcArgs { gaArgs = [f] }
     refs <- lift $ do
         res <- IO.newIORef []
-        withTypechecked globalLock ghcArgs (saveAnalysedTo res)
+        let opts = defaultAnalysisOptions { aoMainPkgFallback = "dummyPkg" }
+        withTypechecked globalLock ghcArgs opts (saveAnalysedTo res)
         IO.readIORef res
     if null refs
         then error "Unexpected: withTypechecked didn't produce any result."
         else return $! NonEmpty.fromList refs
   where
-    saveAnalysedTo xs ghcEnv tm =
-        let opts = defaultAnalysisOptions { aoMainPkgFallback = "dummyPkg" }
-            xref = analyseTypechecked ghcEnv opts tm  --
-        in IO.modifyIORef' xs (xref:)
+    saveAnalysedTo xs xref = IO.modifyIORef' xs (xref:)

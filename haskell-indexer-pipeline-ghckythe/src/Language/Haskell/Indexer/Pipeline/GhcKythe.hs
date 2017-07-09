@@ -43,10 +43,9 @@ ghcToKythe
     -> ([Raw.Entry] -> IO ())
     -> IO ()
 ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
-    withTypechecked globalLock ghcArgs collect
+  withTypechecked globalLock ghcArgs analysisOptions collect
   where
-    collect ghcEnv tm = do
-        let xref = analyseTypechecked ghcEnv analysisOptions tm
+    collect xref = do
         sourceText <- lenientDecodeUtf8 . T.unpack
                     . unSourcePath . analysedTempPath . xrefFile
                     $ xref
