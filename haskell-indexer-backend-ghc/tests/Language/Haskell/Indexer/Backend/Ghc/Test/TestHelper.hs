@@ -37,8 +37,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.IORef as IO
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import GhcMonad (GhcMonad(..))
-import GHC (initGhcMonad)
 import System.FilePath ((</>))
 import System.IO.Unsafe (unsafePerformIO)
 

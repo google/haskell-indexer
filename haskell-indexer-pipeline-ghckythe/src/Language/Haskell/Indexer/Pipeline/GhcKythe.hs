@@ -30,7 +30,6 @@ import qualified Data.Text.Encoding.Error as T
 
 import Language.Haskell.Indexer.Translate
 import Language.Haskell.Indexer.Backend.AnalysisOptions (AnalysisOptions)
-import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
 import Language.Haskell.Indexer.Backend.GhcArgs (GhcArgs)
 import Language.Haskell.Indexer.Backend.GhcApiSupport (withTypechecked)
 import Language.Haskell.Indexer.Frontend.Kythe (toKythe)
@@ -43,7 +42,7 @@ ghcToKythe
     -> ([Raw.Entry] -> IO ())
     -> IO ()
 ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
-  withTypechecked globalLock ghcArgs analysisOptions collect
+    withTypechecked globalLock ghcArgs analysisOptions collect
   where
     collect xref = do
         sourceText <- lenientDecodeUtf8 . T.unpack
