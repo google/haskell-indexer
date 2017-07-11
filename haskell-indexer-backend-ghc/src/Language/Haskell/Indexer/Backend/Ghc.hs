@@ -555,9 +555,7 @@ importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
       return $ ModuleTick pkgModule pkgSpan
 
     extractPkgModule :: GhcMonad m => ExtractCtx -> ModuleName -> m PkgModule
-    extractPkgModule ctx name = do
-      m <- findModule name Nothing
-      return $ extractModuleName ctx m
+    extractPkgModule ctx name = findModule name Nothing >>= return . extractModuleName ctx
 
 
 -- | Fabricates an instance method tick based on RenamedSource data. The
