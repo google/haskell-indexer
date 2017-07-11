@@ -211,10 +211,8 @@ makeRelationFacts (Relation src relKind target) =
 makeImportFacts :: ModuleTick -> Conversion [Raw.Entry]
 makeImportFacts ModuleTick{..} = do
     vn <- asks baseVName
-    makeAnchor mtSpan RefImportsE (pkgvn vn) Nothing Nothing
-  where
-    moduleSig = (getPackage mtPkgModule) <> ":" <> (getModule mtPkgModule)
-    pkgvn v = v { vnSignature = moduleSig }
+    let NameAndEntries pkgvn _ = makePackageFacts vn mtPkgModule
+    makeAnchor mtSpan RefImportsE pkgvn Nothing Nothing
 
 -- Helpers below.
 

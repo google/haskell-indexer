@@ -289,8 +289,8 @@ testUtf8 = assertXRefsFrom "basic/Utf8.hs" $
 -- | Test that the module imports are emitted.
 testImports :: AssertionInEnv
 testImports = assertXRefsFrom "basic/Imports.hs" $ do
-    hasImportAt "Data.Text" (3, 8)
-    hasImportAt "Data.List" (4, 8)
+    importAt (3, 8) "Data.Text"
+    importAt (4, 8) "Data.List"
 
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]

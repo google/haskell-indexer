@@ -114,28 +114,28 @@ analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModu
 analyseTypechecked ghcEnv opts tm = do
     let modSummary = pm_mod_summary . tm_parsed_module $ tm
         -- Analysed modules always arrive as file references in practice.
-    let modFile = T.pack $!
+        modFile = T.pack $!
                       fromMaybe "?" (ml_hs_file . ms_location $ modSummary)
-    let strippedModFile = SourcePath (aoFilePathTransform opts modFile)
-    let ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
-    let renSource = tm_renamed_source tm  :: Maybe RenamedSource
-    let tcSource = tm_typechecked_source tm
-    let declsAlts =
+        strippedModFile = SourcePath (aoFilePathTransform opts modFile)
+        ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
+        renSource = tm_renamed_source tm  :: Maybe RenamedSource
+        tcSource = tm_typechecked_source tm
+        declsAlts =
             let (fromRenamed, declMods) =
                     fromMaybe mempty (declsFromRenamed ctx <$> renSource)
                 fromTypechecked = declsFromTypechecked ctx tcSource declMods
             in fromRenamed ++ fromTypechecked
-    let altMap = declAltMap declsAlts
-    let refs = tcRefs ++ renamedRefs
+        altMap = declAltMap declsAlts
+        refs = tcRefs ++ renamedRefs
           where
             tcRefs = refsFromTypechecked ctx tcSource altMap
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
-    let rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
-    imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
-    let decls = map daDecl declsAlts
-    let moduleTick = give ctx $
+        rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
+        decls = map daDecl declsAlts
+        moduleTick = give ctx $
             mkModuleTick (pm_parsed_source (tm_parsed_module tm))
                          (extractModuleName ctx (ecModule ctx))
+    imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
     return $ XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
             decls refs rels imports
   where
@@ -550,16 +550,14 @@ importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
   where
     mkImport :: GhcMonad m => LImportDecl Name -> m ModuleTick
     mkImport (L _ implDecl) = do
-      pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
+      pkgModule <- (extractPkgModule ctx) . unLoc . ideclName $ implDecl
       let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
       return $ ModuleTick pkgModule pkgSpan
 
-    extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
-    extractPkgModule name = do
+    extractPkgModule :: GhcMonad m => ExtractCtx -> ModuleName -> m PkgModule
+    extractPkgModule ctx name = do
       m <- findModule name Nothing
-      let pkg = T.pack . showPackageName . moduleUnitId $ m
-      let mName = T.pack . moduleNameString . moduleName $ m
-      return $ PkgModule pkg mName
+      return $ extractModuleName ctx m
 
 
 -- | Fabricates an instance method tick based on RenamedSource data. The

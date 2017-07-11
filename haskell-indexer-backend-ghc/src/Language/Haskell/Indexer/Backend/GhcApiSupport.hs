@@ -52,8 +52,8 @@ printErr = liftIO . hPutStrLn stderr
 -- can't process multiple compilations concurrently (see
 -- https://mail.haskell.org/pipermail/ghc-devs/2014-January/003874.html).
 withTypechecked
-  :: MVar () -> GhcArgs -> AnalysisOptions -> (XRef -> IO ()) -> IO ()
-withTypechecked globalLock GhcArgs{..} analysisOpts action
+    :: MVar () -> GhcArgs -> AnalysisOptions -> (XRef -> IO ()) -> IO ()
+withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         = withMVar globalLock . const . errHandling $ do
     -- TODO(robinpalotai): logging
     printErr "Running GHC"
@@ -86,7 +86,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts action
                          (showSDocForUser usedDflags neverQualify . ppr)
         let extractXref = analyseTypechecked env analysisOpts
         mapM (parseModule >=> typecheckModule >=> extractXref) graph
-    mapM_ action xrefGraph
+    mapM_ xrefSink xrefGraph
  where
     errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut
     isHaskellSource src = isHaskellSrcFilename src || looksLikeModuleName src
