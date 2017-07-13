@@ -86,6 +86,7 @@ mergeRefs = Foldable.foldr1 merge
         , xrefDecls = xrefDecls a ++ xrefDecls b
         , xrefCrossRefs = xrefCrossRefs a ++ xrefCrossRefs b
         , xrefRelations = xrefRelations a ++ xrefRelations b
+        , xrefImports = xrefImports a ++ xrefImports b
         }
 
 analyiseFullPath :: FilePath -> ReaderT TestEnv IO (NonEmpty XRef)
@@ -94,13 +95,11 @@ analyiseFullPath f = do
     let ghcArgs = baseGhcArgs { gaArgs = [f] }
     refs <- lift $ do
         res <- IO.newIORef []
-        withTypechecked globalLock ghcArgs (saveAnalysedTo res)
+        let opts = defaultAnalysisOptions { aoMainPkgFallback = "dummyPkg" }
+        withTypechecked globalLock ghcArgs opts (saveAnalysedTo res)
         IO.readIORef res
     if null refs
         then error "Unexpected: withTypechecked didn't produce any result."
         else return $! NonEmpty.fromList refs
   where
-    saveAnalysedTo xs ghcEnv tm =
-        let opts = defaultAnalysisOptions { aoMainPkgFallback = "dummyPkg" }
-            xref = analyseTypechecked ghcEnv opts tm  --
-        in IO.modifyIORef' xs (xref:)
+    saveAnalysedTo xs xref = IO.modifyIORef' xs (xref:)

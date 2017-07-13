@@ -77,6 +77,7 @@ toKythe basevn content XRef{..} = do
         mapM_ (stream . makeDeclFacts) xrefDecls
         mapM_ (stream . makeUsageFacts) xrefCrossRefs
         mapM_ (stream . makeRelationFacts) xrefRelations
+        mapM_ (stream . makeImportFacts) xrefImports
   where
     table = Offset.createOffsetTable (TL.fromStrict content)
     encodedContent = T.encodeUtf8 content
@@ -205,6 +206,13 @@ makeRelationFacts (Relation src relKind target) =
            -- as an interface, and the instance as the implementation.
            -- So by squinting a bit, we'll hopefully get better functionality
            -- out of Kythe-related tools that are not aware of Haskell.
+
+-- | Makes fact about module imports.
+makeImportFacts :: ModuleTick -> Conversion [Raw.Entry]
+makeImportFacts ModuleTick{..} = do
+    vn <- asks baseVName
+    let NameAndEntries pkgvn _ = makePackageFacts vn mtPkgModule
+    makeAnchor mtSpan RefImportsE pkgvn Nothing Nothing
 
 -- Helpers below.
 

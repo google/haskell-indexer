@@ -42,7 +42,7 @@ import ConLike (ConLike(..))
 import HsPat (HsRecField(..))
 import HsTypes (AmbiguousFieldOcc(..))
 #else
-import Module (packageKeyString)
+import Module (packageKeyString, modulePackageKey)
 #endif
 import Name (nameModule_maybe, nameOccName)
 import qualified Outputable as GHC
@@ -110,8 +110,8 @@ moduleUnitId = modulePackageKey
 mayUnLoc = id
 #endif
 
-analyseTypechecked :: GhcEnv -> AnalysisOptions -> TypecheckedModule -> XRef
-analyseTypechecked ghcEnv opts tm =
+analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModule -> m XRef
+analyseTypechecked ghcEnv opts tm = do
     let modSummary = pm_mod_summary . tm_parsed_module $ tm
         -- Analysed modules always arrive as file references in practice.
         modFile = T.pack $!
@@ -135,8 +135,9 @@ analyseTypechecked ghcEnv opts tm =
         moduleTick = give ctx $
             mkModuleTick (pm_parsed_source (tm_parsed_module tm))
                          (extractModuleName ctx (ecModule ctx))
-    in XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
-            decls refs rels
+    imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
+    return $ XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
+            decls refs rels imports
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
@@ -543,6 +544,20 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         let fromAlt = altTickToPrimary declAlts
         in Relation (fromAlt s) k (fromAlt t)
 
+-- | Exports module imports.
+importsFromRenamed :: GhcMonad m => ExtractCtx -> RenamedSource -> m [ModuleTick]
+importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
+  where
+    mkImport :: GhcMonad m => LImportDecl Name -> m ModuleTick
+    mkImport (L _ implDecl) = do
+      pkgModule <- (extractPkgModule ctx) . unLoc . ideclName $ implDecl
+      let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
+      return $ ModuleTick pkgModule pkgSpan
+
+    extractPkgModule :: GhcMonad m => ExtractCtx -> ModuleName -> m PkgModule
+    extractPkgModule ctx name = findModule name Nothing >>= return . extractModuleName ctx
+
+
 -- | Fabricates an instance method tick based on RenamedSource data. The
 -- fabricated tick should be the same the TypecheckedSource-based declaration
 -- will contain.
@@ -560,7 +575,7 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
 
 -- | Returns the (source-based, generated) bindings.
 --
--- The matchgroup (~implementatio) of compiler-generated bindings should not be
+-- The matchgroup (~implementation) of compiler-generated bindings should not be
 -- extracted, since they contain both artificial references and strange
 -- declarations.
 --

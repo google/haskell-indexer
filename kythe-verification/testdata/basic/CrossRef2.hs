@@ -1,6 +1,6 @@
 module CrossRef2 where
 
--- TODO(robinpalotai): verify imports, exports once emitted.
+-- - @"CrossRef1" ref/imports vname("main_main:CrossRef1", "", "", "", "haskell")
 import CrossRef1 (foo)
 
 bar :: Int

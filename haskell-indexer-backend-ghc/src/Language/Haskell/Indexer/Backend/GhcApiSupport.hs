@@ -39,8 +39,11 @@ import System.FilePath ((</>))
 import System.Posix.Signals (installHandler, sigINT, Handler(Default))
 import System.IO (hPutStrLn, stderr)
 
+import Language.Haskell.Indexer.Translate (XRef(..))
 import Language.Haskell.Indexer.Backend.GhcArgs
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
+import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
+import Language.Haskell.Indexer.Backend.AnalysisOptions (AnalysisOptions)
 
 printErr :: MonadIO m => String -> m ()
 printErr = liftIO . hPutStrLn stderr
@@ -49,8 +52,8 @@ printErr = liftIO . hPutStrLn stderr
 -- can't process multiple compilations concurrently (see
 -- https://mail.haskell.org/pipermail/ghc-devs/2014-January/003874.html).
 withTypechecked
-    :: MVar () -> GhcArgs -> (GhcEnv -> TypecheckedModule -> IO ()) -> IO ()
-withTypechecked globalLock GhcArgs{..} action
+    :: MVar () -> GhcArgs -> AnalysisOptions -> (XRef -> IO ()) -> IO ()
+withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         = withMVar globalLock . const . errHandling $ do
     -- TODO(robinpalotai): logging
     printErr "Running GHC"
@@ -58,7 +61,7 @@ withTypechecked globalLock GhcArgs{..} action
     let modifyFlags = maybe id setPgmP (overridePgmP gaToolOverride)
                     . dontGenerateCode
                     . verbose 0
-    runGhc (Just $ gaLibdirPrefix </> libdir) $ do
+    xrefGraph <- runGhc (Just $ gaLibdirPrefix </> libdir) $ do
         -- see GHC trac #4162
         liftIO . void $ installHandler sigINT Default Nothing
         dflags0 <- getSessionDynFlags
@@ -81,7 +84,9 @@ withTypechecked globalLock GhcArgs{..} action
         usedDflags <- getSessionDynFlags
         let env = GhcEnv (showSDoc usedDflags . ppr)
                          (showSDocForUser usedDflags neverQualify . ppr)
-        mapM_ (parseModule >=> typecheckModule >=> (liftIO . action env)) graph
+        let extractXref = analyseTypechecked env analysisOpts
+        mapM (parseModule >=> typecheckModule >=> extractXref) graph
+    mapM_ xrefSink xrefGraph
  where
     errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut
     isHaskellSource src = isHaskellSrcFilename src || looksLikeModuleName src

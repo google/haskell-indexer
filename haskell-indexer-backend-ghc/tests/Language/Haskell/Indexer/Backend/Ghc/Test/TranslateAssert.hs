@@ -30,6 +30,7 @@ module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     , userFriendlyTypeIs
     , hasRelation
     , declPropEquals
+    , importAt
     --
     , extraMethodForInstanceIs
     , extraAlternateIdSpanContainsPos
@@ -48,6 +49,7 @@ import Data.Foldable (sequenceA_)
 import qualified Data.List as L
 import Data.Ord (comparing)
 import Data.Text (Text)
+import qualified Data.Text as T
 
 import Test.HUnit ((@?), assertFailure)
 
@@ -107,6 +109,24 @@ prettyReference ref = "TickReference {"
                    ++ ", pos: " ++ prettySpan (refSourceSpan ref)
                    ++ "}"
 
+-- | Returns the module imports that include the given position.
+-- Fails if there aren't any imports, or there are multiple imports.
+-- Note: this doesn't consider the file, so there might be conflicts
+-- if multiple files are processed. Use only for tests where a single file
+-- is loaded, or explicitly test the file of the returned Import.
+importAt :: (Int,Int) -> Text -> ReaderT XRef IO ()
+importAt pos importName = do
+    imports <- asks xrefImports
+    let filtered = filter (equalsImport pos importName) imports
+    case filtered of
+        [] -> failConcat ["No import ", T.unpack importName, " at pos ", show pos]
+        [im] -> return ()
+        ims -> failConcat
+            ["Multiple imports at pos ", show pos, ":\n", show ims]
+    where
+      equalsImport :: (Int,Int) -> Text -> ModuleTick -> Bool
+      equalsImport pos importName imp =
+          containsPos pos imp && importName == (getModule . mtPkgModule $ imp)
 
 containsPos :: (Spanny a) => (Int,Int) -> a -> Bool
 containsPos pos a = case spanOf a of
@@ -231,3 +251,6 @@ instance Spanny Decl where
 
 instance Spanny TickReference where
     spanOf = Just . refSourceSpan
+
+instance Spanny ModuleTick where
+    spanOf = mtSpan

@@ -74,6 +74,7 @@ data XRef = XRef
     , xrefDecls     :: [Decl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
+    , xrefImports :: [ModuleTick]
     }
     deriving (Eq, Show)
 
@@ -237,7 +238,6 @@ data Relation = Relation
 
 data RelationKind = ImplementsMethod | InstantiatesClass
     deriving (Eq, Ord, Show)
-
 
 -- | An unqualified id for the purpose of displaying to users.
 -- No newtype for this, as we don't do anything with it apart from emitting.
