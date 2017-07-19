@@ -35,6 +35,9 @@ chmod -R 755 /opt/kythe/web/ui  # It misses permission by default.
 
 Version `v0.0.26` is verified to work with Haskell indexer.
 
+If you want to install Kythe in a different location to `/opt/kythe` then you
+should also set `KYTHE_DIR` to the location of the installation.
+
 ## Protoc 3
 
 Download the latest [Proto compiler 3
