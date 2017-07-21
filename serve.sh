@@ -4,7 +4,7 @@ if (($# != 2)); then
   exit 1
 fi
 
-INDEXER_OUTPUT_DIR=$1
+INDEXER_OUTPUT_DIR=$(readlink -m $1)
 
 # Serve the index
 # ===============
