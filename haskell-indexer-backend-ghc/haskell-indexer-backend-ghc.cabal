@@ -12,6 +12,7 @@ category:            Language
 build-type:          Simple
 cabal-version:       >=1.22
 extra-source-files:  testdata/basic/*.hs
+                   , testdata/basic/*.c
                    , testdata/typelink/*.hs
 
 library
@@ -23,6 +24,7 @@ library
                        Language.Haskell.Indexer.Backend.GhcEnv
   build-depends:       base >=4.8 && <4.10
                      , containers
+                     , directory
                      , filepath
                      , ghc
                      , ghc-paths
@@ -48,12 +50,14 @@ Test-Suite basic_test
                        Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
   build-depends: base
                , bytestring
+               , directory
                , filepath
                , ghc
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1
                , semigroups
+               , temporary
                , test-framework
                , test-framework-hunit
                , text
@@ -72,12 +76,14 @@ Test-Suite typelink_test
                        Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
   build-depends: base
                , bytestring
+               , directory
                , filepath
                , ghc
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1
                , semigroups
+               , temporary
                , test-framework
                , test-framework-hunit
                , text

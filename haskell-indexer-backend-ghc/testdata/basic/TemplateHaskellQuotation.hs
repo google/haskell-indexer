@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module UsesTH where
+module TemplateHaskellQuotation where
 
 import Language.Haskell.TH
 

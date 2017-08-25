@@ -16,7 +16,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Haskell.Indexer.Backend.Ghc.Test.BasicTestBase (allTests) where
 
-import Control.Monad ((>=>))
+import Control.Monad ((>=>), void)
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 
 import Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
@@ -31,7 +31,7 @@ type AssertionInEnv = ReaderT TestEnv IO ()
 -- extracted. The argument references happen in various common syntactic
 -- environments, such as if-then-else, case, etc.
 testArgRef :: AssertionInEnv
-testArgRef = assertXRefsFrom "basic/ArgRef.hs" $ do
+testArgRef = assertXRefsFrom ["basic/ArgRef.hs"] $ do
     declAt (3,3) >>= singleUsage >>= includesPos (3,7)
     declAt (5,3) >>= singleUsage >>= includesPos (5,7)
     declAt (7,3) >>= singleUsage >>= includesPos (7,22)
@@ -39,7 +39,7 @@ testArgRef = assertXRefsFrom "basic/ArgRef.hs" $ do
 
 -- | Tests recursive references in various contexts.
 testRecursiveRef :: AssertionInEnv
-testRecursiveRef = assertXRefsFrom "basic/RecursiveRef.hs" $ do
+testRecursiveRef = assertXRefsFrom ["basic/RecursiveRef.hs"] $ do
     -- Recursive function call without type signature targets the
     -- monomorphic binding. Test that we detect this.
     declAt (4,1) >>= singleUsage >>= includesPos (4,14)
@@ -62,7 +62,7 @@ testRecursiveRef = assertXRefsFrom "basic/RecursiveRef.hs" $ do
     declAt (16,1) >>= singleUsage >>= includesPos (16,12)
 
 testDataDecl :: AssertionInEnv
-testDataDecl = assertXRefsFrom "basic/DataDecl.hs" $ do
+testDataDecl = assertXRefsFrom ["basic/DataDecl.hs"] $ do
     -- Plain data type.
     -- Ctor references.
     declAt (3,11) >>= singleUsage >>= includesPos (6,3)
@@ -79,7 +79,7 @@ testDataDecl = assertXRefsFrom "basic/DataDecl.hs" $ do
 
 -- | Test that function applications are emitted as calls.
 testFunCall :: AssertionInEnv
-testFunCall = assertXRefsFrom "basic/FunCall.hs" $ do
+testFunCall = assertXRefsFrom ["basic/FunCall.hs"] $ do
     declAt (3,1) >>= singleUsage >>= assertAll
         [ refKindIs Call
         , includesPos (4,11)
@@ -106,7 +106,7 @@ testFunCall = assertXRefsFrom "basic/FunCall.hs" $ do
 -- Also includes test for types, as typeclass/instance types are trickier to
 -- gather - but this test should be deeper + moved to type tests eventually.
 testTypeClass :: AssertionInEnv
-testTypeClass = assertXRefsFrom "basic/TypeClass.hs" $ do
+testTypeClass = assertXRefsFrom ["basic/TypeClass.hs"] $ do
     -- TODO(robinpalotai): have a separate set of tests where we only
     --   test the reported types of things. For type constructor-like things
     --   maybe we should report their kind instead.
@@ -132,7 +132,7 @@ testTypeClass = assertXRefsFrom "basic/TypeClass.hs" $ do
 -- class + instance name, to make it distinguishable from other instances'
 -- method in the caller list.
 testTypeClassRef :: AssertionInEnv
-testTypeClassRef = assertXRefsFrom "basic/TypeClassRef.hs" $ do
+testTypeClassRef = assertXRefsFrom ["basic/TypeClassRef.hs"] $ do
     declAt (3,1) >>= singleUsage >>= assertAll
         [ refKindIs Call
         , includesPos (9,13)
@@ -145,7 +145,8 @@ testTypeClassRef = assertXRefsFrom "basic/TypeClassRef.hs" $ do
 -- This is a smoke test, doesn't check declarations/references originating
 -- to/from included files.
 testCppInclude :: AssertionInEnv
-testCppInclude = assertXRefsFrom "basic/CppInclude.hs" $
+testCppInclude = assertXRefsFromExtra ["basic/DummyInclude.hs"]
+                                      ["basic/CppInclude.hs"] $
     declAt (4,1) >>= singleUsage >>= assertAll
         [ includesPos (8,30)
         , refContextIs `funk` declAt (8,1)
@@ -153,8 +154,9 @@ testCppInclude = assertXRefsFrom "basic/CppInclude.hs" $
 
 -- | Smoke test that TemplateHaskell works and references to TH-decls are
 -- found. See also b/26456233.
-testTemplateHaskell :: AssertionInEnv
-testTemplateHaskell = assertXRefsFrom "basic/UsesTH.hs" $
+testTemplateHaskellQuotation :: AssertionInEnv
+testTemplateHaskellQuotation = assertXRefsFrom
+      ["basic/TemplateHaskellQuotation.hs"] $
     -- Location for TH-generated decls is just the whole span of the runQ
     -- block - can live with that.
     declsAt (6,3) >>= \case
@@ -163,10 +165,47 @@ testTemplateHaskell = assertXRefsFrom "basic/UsesTH.hs" $
             singleUsage v >>= includesPos (11,17)
         _ -> checking $ assertFailure "Expected two decls from TH."
 
+testTemplateHaskellCodeExec :: AssertionInEnv
+testTemplateHaskellCodeExec = assertXRefsFrom
+      ["basic/TemplateHaskellCodeExec.hs", "basic/UsedByTH.hs"] $
+    void $ declAt (8,1)
+
+testTemplateHaskellWerrorOpt :: AssertionInEnv
+testTemplateHaskellWerrorOpt = assertXRefsFrom
+      ["-O2", "-Werror", "basic/TemplateHaskellQuotation.hs"] $
+    return ()
+
+testTemplateHaskellCodeExecFFI :: AssertionInEnv
+testTemplateHaskellCodeExecFFI = assertXRefsFrom
+      [ "basic/TemplateHaskellCodeExecFFI.hs"
+      , "basic/ForeignImport.hs"
+      , "basic/ffi.c"
+      ] $
+    void $ declAt (8,1)
+
+-- TODO(robinpalotai): add FFI+TH test where an object file is put in args.
+-- TODO(robinpalotai): add FFI+TH test where module has foreign exports.
+
+testForeignImport :: AssertionInEnv
+testForeignImport = assertXRefsFrom
+      ["basic/ForeignImport.hs", "basic/ffi.c"] $
+    -- If we get this far it compiles.
+    -- TODO(robinpalotai): assert declaration once supported.
+    return ()
+
+testForeignExport :: AssertionInEnv
+testForeignExport = assertXRefsFrom ["basic/ForeignExport.hs"] $
+    void $ declAt (7,1)
+
+testRtsArgsSkipped :: AssertionInEnv
+testRtsArgsSkipped = assertXRefsFrom
+      ["+RTS", "-A128M", "-RTS", "basic/ArgRef.hs"] $
+    return ()
+
 -- | Contains same name on type and term level, checks if usages go to the
 -- correct one.
 testDisambiguateTermType :: AssertionInEnv
-testDisambiguateTermType = assertXRefsFrom "basic/TypeVsTerm.hs" $ do
+testDisambiguateTermType = assertXRefsFrom ["basic/TypeVsTerm.hs"] $ do
     declAt (3,10) >>= singleUsage >>= includesPos (6,10)
     declAt (3,6)  >>= singleUsage >>= includesPos (5,11)
 
@@ -174,17 +213,17 @@ testDisambiguateTermType = assertXRefsFrom "basic/TypeVsTerm.hs" $ do
 -- more specific package by including the fallback (set as "dummyPkg" in
 -- TestHelper).
 testExecutableTickPackage :: AssertionInEnv
-testExecutableTickPackage = assertXRefsFrom "basic/ExecutableMain.hs" $
+testExecutableTickPackage = assertXRefsFrom ["basic/ExecutableMain.hs"] $
     declAt (3,1) >>= declPropEquals
         (getPackage . tickPkgModule . declTick) "dummyPkg_main"
 
 testLocalRef :: AssertionInEnv
-testLocalRef = assertXRefsFrom "basic/LocalRef.hs" $ do
+testLocalRef = assertXRefsFrom ["basic/LocalRef.hs"] $ do
     declAt (8,5) >>= singleUsage >>= includesPos (6,32)
     declAt (16,5) >>= singleUsage >>= includesPos (14,34)
 
 testRecordRead :: AssertionInEnv
-testRecordRead = assertXRefsFrom "basic/RecordRead.hs" $ do
+testRecordRead = assertXRefsFrom ["basic/RecordRead.hs"] $ do
     declAt (4,12) >>= usages >>= \case
         -- Don't really caring about this, just a smoke check.
         u1:u2:_ -> do
@@ -215,7 +254,7 @@ testRecordRead = assertXRefsFrom "basic/RecordRead.hs" $ do
     declAt (16,26) >>= singleUsage >>= includesPos (17,24)
 
 testRecordWrite :: AssertionInEnv
-testRecordWrite = assertXRefsFrom "basic/RecordWrite.hs" $ do
+testRecordWrite = assertXRefsFrom ["basic/RecordWrite.hs"] $ do
     declAt (4,12) >>= usages >>= \case
         [u1, u2, u3, u4, u5, u6] -> do
             includesPos (9,10) u1
@@ -267,7 +306,7 @@ testRecordWrite = assertXRefsFrom "basic/RecordWrite.hs" $ do
 -- instead of the Worker / DataCon Id. If we don't handle this, we wouldn't
 -- be able to refer the data constructor.
 testDataConWrap :: AssertionInEnv
-testDataConWrap = assertXRefsFrom "basic/DataConWrap.hs" $
+testDataConWrap = assertXRefsFrom ["basic/DataConWrap.hs"] $
     declAt (3,12) >>= singleUsage >>= includesPos (5,8)
 
 -- | Test that source locations are reported in characters and not bytes. Also
@@ -278,7 +317,7 @@ testDataConWrap = assertXRefsFrom "basic/DataConWrap.hs" $
 -- For example, some text editors refuse to open it at all, and some will
 -- replace the bad sequence with something else. Please verify with a hexeditor.
 testUtf8 :: AssertionInEnv
-testUtf8 = assertXRefsFrom "basic/Utf8.hs" $
+testUtf8 = assertXRefsFrom ["basic/Utf8.hs"] $
     declAt (6,1) >>= usages >>= \case
         [u1, u2] -> do
             spanIs (8,7) (8,10) u1
@@ -288,7 +327,7 @@ testUtf8 = assertXRefsFrom "basic/Utf8.hs" $
 
 -- | Test that the module imports are emitted.
 testImports :: AssertionInEnv
-testImports = assertXRefsFrom "basic/Imports.hs" $ do
+testImports = assertXRefsFrom ["basic/Imports.hs"] $ do
     importAt (3, 8) "Data.Text"
     importAt (4, 8) "Data.List"
 
@@ -302,7 +341,13 @@ allTests env =
     , envTestCase "typeclass" testTypeClass
     , envTestCase "typeclass-ref" testTypeClassRef
     , envTestCase "cpp-include" testCppInclude
-    , envTestCase "th-smoke" testTemplateHaskell
+    , envTestCase "th-quotation" testTemplateHaskellQuotation
+    , envTestCase "th-code-exec" testTemplateHaskellCodeExec
+    , envTestCase "th-code-exec-ffi" testTemplateHaskellCodeExecFFI
+    , envTestCase "th-werror-opt" testTemplateHaskellWerrorOpt
+    , envTestCase "foreign-import" testForeignImport
+    , envTestCase "foreign-export" testForeignExport
+    , envTestCase "rts-args-skipped" testRtsArgsSkipped
     , envTestCase "disambiguate-term-type" testDisambiguateTermType
     , envTestCase "executable-package" testExecutableTickPackage
     , envTestCase "local-ref" testLocalRef
