@@ -27,16 +27,16 @@ import Test.HUnit (assertFailure)
 type AssertionInEnv = ReaderT TestEnv IO ()
 
 testDataVarBinds :: AssertionInEnv
-testDataVarBinds = assertXRefsFrom "typelink/DataVarBinds.hs" $
+testDataVarBinds = assertXRefsFrom ["typelink/DataVarBinds.hs"] $
     -- Type variable.
     declAt (3,9) >>= singleUsage >>= includesPos (3,26)
 
 testAliasVarBinds :: AssertionInEnv
-testAliasVarBinds = assertXRefsFrom "typelink/AliasVarBinds.hs" $
+testAliasVarBinds = assertXRefsFrom ["typelink/AliasVarBinds.hs"] $
     declAt (3,8) >>= singleUsage >>= includesPos (3,13)
 
 testClassVarBinds :: AssertionInEnv
-testClassVarBinds = assertXRefsFrom "typelink/ClassVarBinds.hs" $ do
+testClassVarBinds = assertXRefsFrom ["typelink/ClassVarBinds.hs"] $ do
     -- Class variable.
     declAt (3,9) >>= singleUsage >>= includesPos (4,10)
     -- Free variable in class method.
@@ -47,7 +47,7 @@ testClassVarBinds = assertXRefsFrom "typelink/ClassVarBinds.hs" $ do
         _ -> checking $ assertFailure "Usage count differs"
 
 testForallBinds :: AssertionInEnv
-testForallBinds = assertXRefsFrom "typelink/ForallBinds.hs" $ do
+testForallBinds = assertXRefsFrom ["typelink/ForallBinds.hs"] $ do
     -- For now implicit typevars get the declaration emitted at the first
     -- reference. Might change in future.
     declAt (4,13) >>= usages >>= \case
@@ -63,7 +63,7 @@ testForallBinds = assertXRefsFrom "typelink/ForallBinds.hs" $ do
         _ -> checking $ assertFailure "Usage count differs"
 
 testScopedTypeVarBinds :: AssertionInEnv
-testScopedTypeVarBinds = assertXRefsFrom "typelink/ScopedTypeVar.hs" $ do
+testScopedTypeVarBinds = assertXRefsFrom ["typelink/ScopedTypeVar.hs"] $ do
     declAt (4,13) >>= usages >>= \case
         [u1, u2] -> do
             includesPos (4,13) u1
@@ -85,7 +85,7 @@ testScopedTypeVarBinds = assertXRefsFrom "typelink/ScopedTypeVar.hs" $ do
         _ -> checking $ assertFailure "Scoped usage count differs"
 
 testInlineSignature :: AssertionInEnv
-testInlineSignature = assertXRefsFrom "typelink/InlineSig.hs" $
+testInlineSignature = assertXRefsFrom ["typelink/InlineSig.hs"] $
     declAt (4,15) >>= usages >>= \case
         [sig, inlineSig] -> do
             includesPos (4,19) sig
@@ -93,7 +93,7 @@ testInlineSignature = assertXRefsFrom "typelink/InlineSig.hs" $
         _ -> checking $ assertFailure "Usage count differs"
 
 testLetVarBinds :: AssertionInEnv
-testLetVarBinds = assertXRefsFrom "typelink/LetSig.hs" $
+testLetVarBinds = assertXRefsFrom ["typelink/LetSig.hs"] $
     declAt (4,14) >>= usages >>= \case
         [u1, u2] -> do
             includesPos (4,14) u1
@@ -101,7 +101,7 @@ testLetVarBinds = assertXRefsFrom "typelink/LetSig.hs" $
         _ -> checking $ assertFailure "Usage count differs"
 
 testSimpleSignature :: AssertionInEnv
-testSimpleSignature = assertXRefsFrom "typelink/SimpleSig.hs" $ do
+testSimpleSignature = assertXRefsFrom ["typelink/SimpleSig.hs"] $ do
     -- This case is interesting, as the usage is at the top of the
     -- type tree (and is missed by using 'universeBi').
     declAt (4,13) >>= singleUsage >>= includesPos (4,13)
@@ -109,7 +109,7 @@ testSimpleSignature = assertXRefsFrom "typelink/SimpleSig.hs" $ do
     declAt (7,18) >>= singleUsage >>= includesPos (7,22)
 
 testDataContextRef :: AssertionInEnv
-testDataContextRef = assertXRefsFrom "typelink/DataContext.hs" $
+testDataContextRef = assertXRefsFrom ["typelink/DataContext.hs"] $
     declAt (5,18) >>= usages >>= \case
         [u1, u2] -> do
             includesPos (5,10) u1
@@ -117,7 +117,7 @@ testDataContextRef = assertXRefsFrom "typelink/DataContext.hs" $
         _ -> checking $ assertFailure "Usage count differs"
 
 testContextBinds :: AssertionInEnv
-testContextBinds = assertXRefsFrom "typelink/ContextBinds.hs" $ do
+testContextBinds = assertXRefsFrom ["typelink/ContextBinds.hs"] $ do
     -- In the unscoped case, we put the decl on the first occurence,
     -- including the context. It's somewhat arbitrary, but at least
     -- makes sure we don't miss the context.
