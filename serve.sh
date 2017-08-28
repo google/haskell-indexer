@@ -1,11 +1,17 @@
 #!/bin/bash
-if (($# != 2)); then
-  echo "Usage: $0 /tmp/logs localhost:8080" >&2
+if (($# != 1)); then
+  echo "Usage: $0 localhost:8080" >&2
+  echo "Env variables with their defaults:" >&2
+  echo "  - INDEXER_OUTPUT_DIR=/tmp/indexer-output" >&2
+  echo "    Where to read entries from, and write serving tables." >&2
+  echo "  - KYTHE_DIR=/opt/kythe" >&2
+  echo "    Kythe install dir, containing Kythe tools.." >&2
   exit 1
 fi
 
-INDEXER_OUTPUT_DIR=$1
+INDEXER_OUTPUT_DIR="${INDEXER_OUTPUT_DIR:-/tmp/indexer-output}"
 KYTHE_DIR="${KYTHE_DIR:-/opt/kythe}"
+ADDRESS="$1"
 
 # Serve the index
 # ===============
@@ -29,5 +35,5 @@ echo "== Starting HTTP server."
 echo " * Click the ::/ in the top-left!"
 $KYTHE_DIR/tools/http_server \
     --serving_table "$INDEXER_OUTPUT_DIR/tbl" \
-    --listen "$2" \
+    --listen "$ADDRESS" \
     --public_resources $KYTHE_DIR/web/ui
