@@ -15,7 +15,7 @@ cabal-version:       >=1.22
 library
   hs-source-dirs:      src
   exposed-modules:     Language.Haskell.Indexer.Util.Path
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , filepath
                      , text
   default-language:    Haskell2010

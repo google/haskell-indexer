@@ -70,6 +70,10 @@ matrix:
     compiler: ": #stack lts-8 (GHC 8.0.2)"
     addons: {apt: {packages: [libgmp-dev]}}
 
+  - env: BUILD=stack ARGS="--resolver nightly-2017-08-25"
+    compiler: ": #stack nightly (GHC 8.2.1)"
+    addons: {apt: {packages: [libgmp-dev]}}
+
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
     compiler: ": #stack nightly"

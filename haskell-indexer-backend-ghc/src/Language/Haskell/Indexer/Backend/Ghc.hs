@@ -12,11 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
-{-# LANGUAGE LambdaCase, OverloadedStrings, RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 {-| Converts GHC typechecked AST into intermediate Analysed format.
 
 This module should not assume anything about the backend consuming the
@@ -31,6 +34,9 @@ module Language.Haskell.Indexer.Backend.Ghc
 -- TODO(robinpalotai) qualify these
 import qualified Bag as GHC
 import qualified BasicTypes as GHC
+#if __GLASGOW_HASKELL__ >= 802
+import qualified ConLike as GHC
+#endif
 import qualified DataCon as GHC
 import qualified Name as GHC
 import FastString (unpackFS)
@@ -40,9 +46,12 @@ import qualified Id as GHC
 import Module (unitIdString)
 import ConLike (ConLike(..))
 import HsPat (HsRecField(..))
-import HsTypes (AmbiguousFieldOcc(..))
+import HsTypes (AmbiguousFieldOcc(..), hsib_vars, hswc_wcs)
 #else
 import Module (packageKeyString, modulePackageKey)
+#endif
+#if __GLASGOW_HASKELL__ >= 802
+import HsDecls (hsGroupInstDecls)
 #endif
 import Name (nameModule_maybe, nameOccName)
 import qualified Outputable as GHC
@@ -108,6 +117,10 @@ showPackageName :: PackageKey -> String
 showPackageName = packageKeyString
 moduleUnitId = modulePackageKey
 mayUnLoc = id
+#endif
+
+#if __GLASGOW_HASKELL__ >= 802
+hs_instds = hsGroupInstDecls
 #endif
 
 analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModule -> m XRef
@@ -226,7 +239,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         let -- Collect the usages so we can assign a binding at the first usage.
             -- Note: we could also just omit the location, making it an implicit
             -- decl. Or put the location as an alternate span.
-            allUsages = mapMaybe nameFromTyVar . universeBi $ hsGroup
+            allUsages = mapMaybe hsTypeVarName . universeBi $ hsGroup
             firstUsages = mapMaybe keepFirst
                 . groupBy ((==) `on` fst)
                 . sortBy (comparing fst)
@@ -243,15 +256,17 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
         fromLoc (L l n) = (n, l)
         --
-        nameFromTyVar :: HsType Name -> Maybe (Located Name)
-        nameFromTyVar (HsTyVar n) = Just $! n
-        nameFromTyVar _ = Nothing
         namesFromHsIbWc :: LHsSigWcType Name -> [Name]
-        namesFromHsIbWc (HsIB names _) = names
+        namesFromHsIbWc =
+#if __GLASGOW_HASKELL__ >= 802
+            hswc_wcs
+#else
+            hsib_vars
+#endif
         namesFromHsIbSig :: LHsSigType Name -> [Name]
-        namesFromHsIbSig (HsIB names _) = names
+        namesFromHsIbSig = hsib_vars
         namesFromHsWC :: LHsWcType Name -> [Name]
-        namesFromHsWC (HsWC names _ _) = names
+        namesFromHsWC = hswc_wcs
     --
     namesFromForall :: HsType Name -> [Name]
     namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
@@ -274,7 +289,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             Explicit -> map (mkDecl . unLoc) . hsq_tvs $ binders
               where
                 mkDecl binder =
-                    nameDeclAlt ctx (hsTyVarName binder) Nothing
+                    nameDeclAlt ctx (hsTyVarBinderName binder) Nothing
                                 typeStringyType
             Implicit  -> implicitCase
             Qualified -> implicitCase
@@ -285,7 +300,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
       where
         implicitCase =
             let boundTyVarNames = Set.fromList
-                                . map (hsTyVarName . unLoc) . hsq_tvs
+                                . map (hsTyVarBinderName . unLoc) . hsq_tvs
                                 $ binders
                 usages = mapMaybe (interestingNameToLoc boundTyVarNames)
                        . universeBi
@@ -298,7 +313,9 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
                  where mkDecl (n,l) = declWithWrappedIdLoc typeStringyType
                                                            (L l n)
         --
-        interestingNameToLoc s (L loc (HsTyVar n))
+        interestingNameToLoc :: Set.Set Name -> LHsType Name
+                             -> Maybe (Name, SrcSpan)
+        interestingNameToLoc s (L loc (hsTypeVarName -> Just n))
             | Set.member n s = Just $! (n, loc)
             | otherwise = Nothing
         interestingNameToLoc _ _ = Nothing
@@ -316,15 +333,17 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     hsqShim = hsq_tvs
     declsFromDataBinders :: LHsTyVarBndrs Name -> [DeclAndAlt]
 #endif
-    declsFromDataBinders = map (mkDecl . hsTyVarName . unLoc) . hsqShim
+    declsFromDataBinders = map (mkDecl . hsTyVarBinderName . unLoc) . hsqShim
       where
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
-    hsTyVarName :: HsTyVarBndr id -> id
-    hsTyVarName = \case
+    hsTyVarBinderName :: HsTyVarBndr id -> id
+    hsTyVarBinderName = \case
         UserTyVar n -> mayUnLoc n
         KindedTyVar n _ -> unLoc n
     -- Datatypes.
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
+    dataDecls (L _ (DataDecl locName binders _ defn _ _)) =
+#elif __GLASGOW_HASKELL__ >= 800
     dataDecls (L _ (DataDecl locName binders defn _ _)) =
 #else
     dataDecls (L _ (DataDecl locName binders defn _ )) =
@@ -344,14 +363,23 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             dataLikeDecl cd (head conLNames)  -- TODO(robinp): all ctors
 #endif
     -- Type aliases.
+#if __GLASGOW_HASKELL__ >= 802
+    dataDecls (L _ sd@(SynDecl locName binders _ _ _)) =
+#else
     dataDecls (L _ sd@(SynDecl locName binders _ _)) =
+#endif
         -- For type aliases we use 'dataLikeDecl' to render the full definition
         -- into the docstring, which is usually short and helpful for aliases.
         let alias = dataLikeDecl sd locName
             tyvars = declsFromDataBinders binders
         in alias:tyvars
     -- Typeclasses.
+    -- TODO(robinpalotai): functional dependencies.
+#if __GLASGOW_HASKELL__ >= 802
+    dataDecls (L _ (ClassDecl _ locName binders _ _ sigs _ _ _ _ _)) =
+#else
     dataDecls (L _ (ClassDecl _ locName binders _ sigs _ _ _ _ _)) =
+#endif
         let top = dataCtorLikeDecl locName
             tyvars = declsFromDataBinders binders
             fromSigs = concatMap (sigDecls . unLoc) sigs
@@ -490,11 +518,11 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
     in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
     refsFromHsType :: LHsType Name -> Maybe Reference
-    refsFromHsType (L l ty) = case ty of
+    refsFromHsType (L l ty) = case hsTypeVarName ty of
         -- Basic variable at the leaves of type trees.
         -- Not only "real" type variables, but also type-level terms like
         -- specific types, type aliases etc.
-        HsTyVar n -> give ctx (nameLocToRef (mayUnLoc n) Ref l)
+        Just n -> give ctx (nameLocToRef (mayUnLoc n) Ref l)
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
 
@@ -747,7 +775,7 @@ specialVar v = case take 2 (nameOccurenceString (varName v)) of
 data SpecialVar
     = TypeclassySV
     | DataConWorkerWrapperSV DataCon
-    deriving (Eq, Ord)
+    deriving (Eq)
 
 -- | As nameDeclAlt but for Vars. Uses the Var as the source of type info.
 varDeclAlt :: ExtractCtx -> Var -> Maybe Var -> DeclAndAlt
@@ -859,6 +887,18 @@ instanceAbsBinds = \case
             Just $! [bind]
 #endif
     _ -> Nothing
+
+#if __GLASGOW_HASKELL__ >= 802
+hsTypeVarName :: HsType Name -> Maybe (Located Name)
+hsTypeVarName (HsTyVar _ n) = Just $! n
+#elif __GLASGOW_HASKELL__ >= 800
+hsTypeVarName :: HsType Name -> Maybe (Located Name)
+hsTypeVarName (HsTyVar n) = Just $! n
+#else
+hsTypeVarName :: HsType Name -> Maybe Name
+hsTypeVarName (HsTyVar n) = Just $! n
+#endif
+hsTypeVarName _ = Nothing
 
 -- | Pulls the AbsBinds below the top one up (if typeclass instance method), or
 -- leaves the original in place otherwise.
@@ -997,7 +1037,13 @@ refsFromTypechecked ctx tsrc declAlts =
         --
         -- Note: What is an EAsPat, and what is its first id?
         --
-        HsWrap _ e -> refsFromExpr (L l e)
+        HsWrap _ e -> refsFromExpr (L l e)  -- 'e' is just HsExpr, not LHsExpr.
+#if __GLASGOW_HASKELL__ >= 802
+        HsConLikeOut conLike ->
+            -- From GHC 8.2.1, ctor reference is not just a simple HsVar.
+            let name = GHC.conLikeName conLike
+            in maybeToList (give ctx (nameLocToRef name Ref l))
+#endif
 #if __GLASGOW_HASKELL__ >= 800
         RecordCon locDataConId _ _ r -> recordConRefs locDataConId r
         -- TODO(robinp): emit ref to all the possible constructors (also below).

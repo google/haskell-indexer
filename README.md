@@ -11,7 +11,7 @@ Indexing hosts:
  - Windows, MacOS: didn't try - backend part likely compiles, wiring and Kythe frontend likely not (see #38).
 
 Compilers:
-  - GHC 7.10.3, 8.0.1, 8.0.2
+  - GHC 7.10.3, 8.0.1, 8.0.2, 8.2.1
   
 [![Build Status](https://travis-ci.org/google/haskell-indexer.svg?branch=master)](https://travis-ci.org/google/haskell-indexer)
 

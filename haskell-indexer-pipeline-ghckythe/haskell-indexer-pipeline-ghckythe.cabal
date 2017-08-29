@@ -15,7 +15,7 @@ cabal-version:       >=1.22
 library
   hs-source-dirs:      src
   exposed-modules:     Language.Haskell.Indexer.Pipeline.GhcKythe
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , bytestring
                      , conduit
                      , filepath
