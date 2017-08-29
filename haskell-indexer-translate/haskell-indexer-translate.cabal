@@ -17,7 +17,7 @@ library
   exposed-modules:     Language.Haskell.Indexer.Translate
                        Language.Haskell.Indexer.Translate.Render
                        Language.Haskell.Indexer.Translate.Utils
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , bytestring
                      , filepath
                      , text

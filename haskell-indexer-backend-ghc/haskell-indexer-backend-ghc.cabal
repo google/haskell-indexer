@@ -22,7 +22,7 @@ library
                        Language.Haskell.Indexer.Backend.GhcArgs
                        Language.Haskell.Indexer.Backend.GhcApiSupport
                        Language.Haskell.Indexer.Backend.GhcEnv
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , containers
                      , directory
                      , filepath

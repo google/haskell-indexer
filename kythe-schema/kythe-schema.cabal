@@ -18,7 +18,7 @@ library
                        Language.Kythe.Schema.Raw.Proto
                        Language.Kythe.Schema.Raw
                        Language.Kythe.Schema.Typed
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , bytestring
                      , data-default
                      , kythe-proto

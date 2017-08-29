@@ -15,7 +15,7 @@ cabal-version:       >=1.22
 executable "ghc_kythe_wrapper"
   hs-source-dirs:      src
   main-is:             GhcKytheWrapper.hs
-  build-depends:       base >=4.8 && <4.10
+  build-depends:       base >=4.8 && <5
                      , bytestring
                      , haskell-indexer-backend-core >= 0.1
                      , haskell-indexer-backend-ghc >= 0.1
