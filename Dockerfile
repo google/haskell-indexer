@@ -1,7 +1,7 @@
 # Use the following command to build image:
 #
 #   docker build -t hsidx-build .
-FROM fpco/stack-build:lts-6.30
+FROM fpco/stack-build:lts-9.2
 
 # chmod needed if set-user is true in stackage.yaml's docker section.
 RUN cd /tmp && \

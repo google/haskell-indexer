@@ -1,0 +1,22 @@
+resolver: lts-9.2
+
+packages:
+- haskell-indexer-backend-core
+- haskell-indexer-backend-ghc
+- haskell-indexer-frontend-kythe
+- haskell-indexer-pathutil
+- haskell-indexer-pipeline-ghckythe
+- haskell-indexer-pipeline-ghckythe-wrapper
+- haskell-indexer-translate
+- kythe-proto
+- kythe-schema
+- text-offset
+
+# Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
+# `proto-lens-protoc` in stack's local DB.  See:
+# https://github.com/google/proto-lens/blob/master/README.md#using-cabal
+explicit-setup-deps:
+  "*": true
+
+nix:
+  packages: [gcc, protobuf3_2]

@@ -16,7 +16,7 @@ do
   fi
   log "$arg"
 done
-REALGHC=/opt/stackage/lts-6/ghc/lib/ghc-7.10.3/bin/ohc
+REALGHC=/opt/ghc/8.0.2/bin/ohc
 log "== Passing through.."
 log "$REALGHC $@"
 $REALGHC "$@"
