@@ -23,8 +23,8 @@ build_image() {
   echo "== Building build image with protoc."
   docker build -t hsidx-build .
   echo "== Building ghc kythe wrapper."
-  stack --docker build
-  WRAPPER=$(stack --docker path | grep local-install-root | cut -d: -f2 | sed 's/^\s*//')/bin/ghc_kythe_wrapper
+  stack --docker build --stack-yaml stack-lts-9.2.yaml
+  WRAPPER=$(stack --docker --stack-yaml stack-lts-9.2.yaml path | grep local-install-root | cut -d: -f2 | sed 's/^\s*//')/bin/ghc_kythe_wrapper
   echo "== Wrapper built at $WRAPPER."
   pushd wrappers/stack-docker
   echo "== Building build image with fake ghc included."
@@ -32,7 +32,7 @@ build_image() {
   cp $WRAPPER ./wrapper
   docker build -t fake-build --build-arg wrapper_path=wrapper .
   rm wrapper
-  echo "== Done, happy indexing!"
+  echo "== Done, happy indexing! $(date)"
   popd
 }
 
@@ -43,21 +43,25 @@ do_index() {
   echo "==       (--force-dirty only affects local packages)."
   echo "==       Also change the build target to 'everything'."
   pushd wrappers/stack-docker
+  mv ~/.stack ~/.stack.saved
   [ ! -e $OUT ] && mkdir $OUT
   # change 'test-package' to 'everything' for more fun.
   stack --docker \
       --docker-image fake-build \
       --docker-mount "$OUT:/logs" \
-      --stack-yaml stack-lts-6.30.yaml \
+      --stack-yaml stack-lts-9.2.yaml \
       build \
+      --keep-going \
       --force-dirty \
-      test-package
-  echo "== Done, entries and logs in $OUT."
+      everything
+  echo "== Done, entries and logs in $OUT. $(date)"
+  mv ~/.stack /tmp/stack-$(date +"%s")
+  mv ~/.stack.saved ~/.stack
   popd
 }
 
 serve() {
-  echo "== Writing entries to Kythe graphstore."
+  echo "== Writing entries to Kythe graphstore. $(date)"
   pushd wrappers/stack-docker
   # It's probably more efficient to cat them together, but this way we see
   # if a given one is corrupted for any reason.
@@ -66,12 +70,12 @@ serve() {
     echo " * $e"
     cat $e | /opt/kythe/tools/write_entries --graphstore $OUT/gs
   done
-  echo "== Converting to serving tables."
+  echo "== Converting to serving tables. $(date)"
   /opt/kythe/tools/write_tables \
       --graphstore $OUT/gs \
       --out $OUT/tbl \
       --compress_shards
-  echo "== Starting HTTP server."
+  echo "== Starting HTTP server. $(date)"
   echo " * Click the ::/ in it's top-left!"
   /opt/kythe/tools/http_server \
       --serving_table $OUT/tbl \
