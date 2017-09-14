@@ -1,5 +1,5 @@
 -- Haskell package+module combination corresponds to Kythe package.
--- - @Module ref Pkg
+-- - @Module defines/binding Pkg
 -- - Pkg.node/kind package
 module Module where
 
