@@ -71,9 +71,8 @@ toKythe basevn content XRef{..} = do
         pkgFileEntry = edge filevn ChildOfE pkgvn
     sourceList (pkgFileEntry : pkgEntries ++ fileEntries)
     flip runReaderT env $ do
-        -- Note: Kythe schema doesn't do 'define/binding' on package which
-        -- makes sense generally. So we don't do so either from Haskell.
-        stream (makeAnchor (mtSpan xrefModule) RefE pkgvn Nothing Nothing)
+        stream (makeAnchor (mtSpan xrefModule) DefinesBindingE pkgvn
+                           Nothing Nothing)
         mapM_ (stream . makeDeclFacts) xrefDecls
         mapM_ (stream . makeUsageFacts) xrefCrossRefs
         mapM_ (stream . makeRelationFacts) xrefRelations
