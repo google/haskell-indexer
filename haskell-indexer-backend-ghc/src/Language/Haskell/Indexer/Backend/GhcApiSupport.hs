@@ -36,6 +36,7 @@ import GHC
 import qualified Linker
 import Outputable
 
+import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void, when)
 import Control.Monad.IO.Class
@@ -81,26 +82,28 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             ghcDflagOp f = getSessionDynFlags >>= f
             pureDflagOp :: (DynFlags -> a) -> Ghc a
             pureDflagOp f = ghcDflagOp (return . f)
+            -- | Warning: don't call this (or setSessionDynFlags) before
+            -- parsing the actual arguments! It seems the first call to
+            -- setSessionDynFlags caches the package databases, and if you miss
+            -- passing the custom dbs from the command line, later invocations
+            -- won't fix that and GHC won't find those packages.
             modifyDflags :: (DynFlags -> DynFlags) -> Ghc ()
             modifyDflags f =
                 fmap f GHC.getSessionDynFlags >>= void . GHC.setSessionDynFlags
         -- The obscure preparation that follows is explained in
         -- https://gist.github.com/robinp/49c68c6f69f6aabfddee3cba42b4964f,
         -- further referenced below as 'the gist'.
-        defaultHscTarget <- pureDflagOp hscTarget
-        defaultLink <- pureDflagOp ghcLink
         printErr $ "GHC arguments: " ++ show gaArgs
-        -- This is our baseline config, to be modified by actual flags.
-        modifyDflags (dontGenerateCode . verbose 0)
-        unusedArgs <- do
+        (unusedArgs, (defaultHscTarget, defaultLink)) <- do
             (newDflags, unused, errors) <- ghcDflagOp (flip parseDynamicFlags
                                                         (map noLoc gaArgs))
-            modifyDflags (const newDflags)
+            modifyDflags (verbose 0 . const newDflags)
+            defaultTargetAndLink <- pureDflagOp (hscTarget &&& ghcLink)
             unless (null errors) $
                 -- TODO(robinpalotai): error out.
                 printErr $ "Flag errors: "
                               ++ L.intercalate ", " (map unLoc errors)
-            return unused
+            return (unused, defaultTargetAndLink)
         ghcDflagOp (\d -> printErr $ show ("Codegen state after flag parse",
                               hscTarget d, ghcLink d))
         -- After dynamic flag parsing, what remains: Haskell and non-Haskell
@@ -129,8 +132,9 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         GHC.setTargets hsTargets
         -- Note: depanal caches current DynFlags into module dflags.
         graphPreliminary <- depanal [] False
-        let thNeeded = needsTemplateHaskell graphPreliminary
-        when thNeeded $ do
+        if not (needsTemplateHaskell graphPreliminary)
+        then modifyDflags dontGenerateCode
+        else do
             -- Actually very few TH usage needs code generation, but it's
             -- hard to tell upfront if that's the case: see the gist or
             -- the tests for an example splice pattern that needs it.
@@ -227,3 +231,5 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             Linker.unload state []
             Linker.linkCmdLineLibs state
             -- TODO(robinpalotai): link packages? See 'reallyInitDynLinker'.
+            -- This might be needed if TH executes code from other package? Or
+            -- only if that code needs FFI?
