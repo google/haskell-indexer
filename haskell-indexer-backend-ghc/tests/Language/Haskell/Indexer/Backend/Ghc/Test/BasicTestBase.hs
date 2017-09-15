@@ -183,8 +183,7 @@ testTemplateHaskellCodeExecFFI = assertXRefsFrom
       ] $
     void $ declAt (8,1)
 
--- TODO(robinpalotai): add FFI+TH test where an object file is put in args.
--- TODO(robinpalotai): add FFI+TH test where module has foreign exports.
+-- TODO(https://github.com/google/haskell-indexer/issues/70): more infra tests.
 
 testForeignImport :: AssertionInEnv
 testForeignImport = assertXRefsFrom
@@ -328,7 +327,7 @@ testUtf8 = assertXRefsFrom ["basic/Utf8.hs"] $
 -- | Test that the module imports are emitted.
 testImports :: AssertionInEnv
 testImports = assertXRefsFrom ["basic/Imports.hs"] $ do
-    importAt (3, 8) "Data.Text"
+    importAt (3, 8) "Data.Int"
     importAt (4, 8) "Data.List"
 
 -- | Prepares the tests to run with the given test environment.

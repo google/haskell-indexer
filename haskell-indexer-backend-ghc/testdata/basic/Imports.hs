@@ -1,4 +1,4 @@
 module Imports where
 
-import Data.Text as T
+import Data.Int
 import Data.List (groupBy, sortBy)
