@@ -22,6 +22,7 @@ library
                        Language.Haskell.Indexer.Backend.GhcArgs
                        Language.Haskell.Indexer.Backend.GhcApiSupport
                        Language.Haskell.Indexer.Backend.GhcEnv
+  other-modules:       Language.Haskell.Indexer.Backend.Compat
   build-depends:       base >=4.8 && <5
                      , containers
                      , directory
@@ -37,6 +38,7 @@ library
                      , transformers
                      , unix
                      , unordered-containers
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 Test-Suite basic_test
