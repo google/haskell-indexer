@@ -120,19 +120,24 @@ conDeclNames (ConDeclGADT conNames _ _) = conNames
 conDeclNames (ConDecl conNames _ _ _ _ _ _ _) = conNames
 #endif
 
-maybeAbsBinds :: HsBindLR a b  -> Maybe (LHsBinds a, [(a, Maybe a)])
+data AbsBindsKind = NormalAbs | SigAbs
+    deriving (Eq)
+
+maybeAbsBinds :: HsBindLR a b
+              -> Maybe (LHsBinds a, [(a, Maybe a)], AbsBindsKind)
 maybeAbsBinds (AbsBinds _ _ exports _ binds) =
     let ids = map (abe_poly &&& (Just . abe_mono)) exports
-    in Just $! (binds, ids)
+    in Just $! (binds, ids, NormalAbs)
 #if __GLASGOW_HASKELL__ >= 800
 maybeAbsBinds (AbsBindsSig _ _ poly _ _ bind) =
     let binds = Bag.unitBag bind
         ids = [(poly, Nothing)]
-    in Just $! (binds, ids)
+    in Just $! (binds, ids, SigAbs)
 #endif
 maybeAbsBinds _ = Nothing
 
-pattern AbsBindsCompat binds ids <- (maybeAbsBinds -> Just (binds, ids))
+pattern AbsBindsCompat binds ids abskind <-
+    (maybeAbsBinds -> Just (binds, ids, abskind))
 
 -- | Represents various spans of 'instance' declarations separately.
 data SplitInstType = SplitInstType

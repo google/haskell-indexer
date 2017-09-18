@@ -48,7 +48,7 @@ import OccName (occNameString)
 import SrcLoc (realSrcSpanStart, realSrcSpanEnd)
 import Var (Var, varName, varType)
 
-import Control.Arrow (second)
+import Control.Arrow ((***), second)
 import Data.Bool (bool)
 import Data.Data (Data)
 import Data.Either (partitionEithers)
@@ -538,7 +538,7 @@ partitionTopLevelBindsByMatchGroupOrigin =
     isFromSource = \case
         FunBindCompat _ mg ->
             not . GHC.isGenerated . mg_origin $ mg
-        AbsBindsCompat binds _ ->
+        AbsBindsCompat binds _ _ ->
             -- Practically there will be a FunBind below which holds the truth.
             -- Except typeclass instance methods, which will have an extra
             -- layer of AbsBinds, but the recursion takes care of that.
@@ -583,13 +583,6 @@ deepDeclsFromTopBind ctx top =
       where
         varDeclNoAlt v = varDeclAlt ctx v Nothing
 
--- | Glorified pair.
-data SureParentChild a = SureParentChild !a !a
-
--- | Convenience for having the children bundled up with the parent.
-childrenWithParent :: (Data a, Typeable a) => a -> [SureParentChild a]
-childrenWithParent a = map (SureParentChild a) (children a)
-
 data ParentChild a = ParentChild
   { pcParent :: !(Maybe a)
   , pcChild :: !a
@@ -618,26 +611,40 @@ universeWithParents a = ParentChild Nothing a : go a
 -- Note: Typechecked fundecls contain record accessors, but not data
 -- constructors - latter are exported from the renamed source.
 declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind Id)] -> [DeclAndAlt]
-declsFromHsBinds ctx = concatMap go
+declsFromHsBinds ctx = dedupByTick . concatMap go
   where
-    go (ParentChild (Just (L _ (AbsBindsCompat _ _)))
-                    (L _ (FunBindCompat _ _))) = []
-    go (ParentChild _ c) = absFunDeclsFromHsBind ctx c
-
--- | Extracts both AbsBinds and FunBinds. The separation is needed since
--- deduping is required upstream.
-absFunDeclsFromHsBind :: ExtractCtx -> LHsBind Id -> [DeclAndAlt]
-absFunDeclsFromHsBind ctx (L _ b) = case b of
-    FunBindCompat (L idLoc funVar) _ ->
-        let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
-                             (varDecl ctx funVar)
-        in [DeclAndAlt decl Nothing]
-    AbsBindsCompat _ exports ->
-        let mkAbeVar = uncurry (varDeclAlt ctx)
-        in map mkAbeVar . filter (not . isInstanceMethodVar . fst) $ exports
-    _ ->
-        -- TODO(robinpalotai): anything to do here?
-        []
+    go (ParentChild (Just (L _ (AbsBindsCompat _ exports k)))
+                    (L _ (FunBindCompat lVar _)))
+        | k == NormalAbs = []
+        | k == SigAbs =
+            -- Need special handling, since it AbsBindsSig doesn't expose the
+            -- monomorphic binding. So we harvest it from the FunBind below.
+            let primary = varDecl ctx . fst . head $ exports
+                          -- head is safe here but ugly. Maybe better pattern?
+                alternative = nameInModuleToTick ctx (varName (unLoc lVar))
+            in [DeclAndAlt primary (Just $! alternative)]
+    go (ParentChild _ c) = absFunDeclsFromHsBind c
+    --
+    absFunDeclsFromHsBind :: LHsBind Id -> [DeclAndAlt]
+    absFunDeclsFromHsBind (L _ b) = case b of
+        FunBindCompat (L idLoc funVar) _ ->
+            let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
+                                 (varDecl ctx funVar)
+            in [DeclAndAlt decl Nothing]
+        AbsBindsCompat _ exports _ ->
+            let abeVar = uncurry (varDeclAlt ctx)
+            in map abeVar . filter (not . isInstanceMethodVar . fst) $ exports
+        _ ->
+            -- TODO(robinpalotai): anything to do here?
+            []
+    -- | Deduping is needed since an AbsBindsSig gets the decl emitted twice,
+    -- but note that only one of them (the latter, deeper the tree) has an
+    -- alternative, which we need. TODO(robinp): this is hacky. Maybe preserve
+    -- the explicit tree structure while traversing for efficient dedup.
+    dedupByTick :: [DeclAndAlt] -> [DeclAndAlt]
+    dedupByTick = map last . groupBy ((==) `on` crit) . sortBy (comparing crit)
+      where
+        crit = declTick . daDecl
 
 -- | These are special typeclass related bindings which are not
 -- needed for us now (and contain overlapping declarations).
@@ -758,7 +765,7 @@ mkRedirect = (,)
 -- | If the arg is a top-level AbsBinds for a typeclass instance method,
 -- returns the AbsBinds below it - this is an irregularity in the AST.
 instanceAbsBinds :: LHsBindLR Id Id -> Maybe [LHsBindLR Id Id]
-instanceAbsBinds (L _ (AbsBindsCompat binds exports))
+instanceAbsBinds (L _ (AbsBindsCompat binds exports _))
     | (isInstanceMethodVar . fst) `any` exports = Just $! GHC.bagToList binds
 instanceAbsBinds _ = Nothing
 
@@ -779,7 +786,7 @@ refsFromTypechecked :: ExtractCtx -> TypecheckedSource -> DeclAltMap
                     -> [TickReference]
 refsFromTypechecked ctx tsrc declAlts =
     let sourceBasedBinds = fst (partitionTopLevelBindsByMatchGroupOrigin tsrc)
-    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= childrenWithParent
+    in sourceBasedBinds >>= pullInstanceAbsBindsToTop >>= children
            >>= refsFromBelowTop
     -- TODO(robinpalotai): sort out what happens to files in these spans if
     --   there is a preprocessor.
@@ -796,29 +803,20 @@ refsFromTypechecked ctx tsrc declAlts =
     -- suitable - practically FunBind is suitable, PatBind is usually not,
     -- since it is not obvious which part of the pattern should we attribute
     -- references to.
-    refsFromBelowTop (SureParentChild (L _ parent) (L _ subBind)) =
+    refsFromBelowTop (L _ subBind) =
         let exprRefs = concatMap refsFromExpr . universeBi $ subBind
             (patRefs, redirs) = unzip . map refsFromPat . universeBi $ subBind
             refContextTick = case subBind of
-                FunBindCompat (L _  declRef) _ -> case parent of
-                    -- Note: AbsBindsSig doesn't expose the monomorphic binding,
-                    -- so we can't easily retarget, but the internal FunBind's
-                    -- name is still monomorphic.
-#if __GLASGOW_HASKELL__ >= 800
-                    AbsBindsSig _ _ poly _ _ _ ->
-                        Just $! nameInModuleToTick ctx (varName poly)
-#endif
-                    _ ->
-                        Just $! nameInModuleToTick ctx (varName declRef)
+                FunBindCompat (L _  declRef) _ ->
+                    Just $! nameInModuleToTick ctx (varName declRef)
                 _ -> Nothing
         in map (toTickReference ctx refContextTick declAlts)
                (postprocess (concat redirs) exprRefs ++ concat patRefs)
     -- | Deal with preprocessed things later.
     --sourceMatches f (Reference _ rs) = spanFile rs == f
     --
-    -- | Interestingly pattern bindings can also contain references - for
-    -- example when a data constructor is pattern matched, the ctor name is
-    -- referred.
+    -- | Pattern bindings can also contain references - for example when a data
+    -- constructor is pattern matched, the ctor name is referred.
     refsFromPat :: LPat Id -> ([Reference], [Redirect])
     refsFromPat (L _ p) = case p of
         -- ConPatOut (we are after typechecking).
@@ -848,7 +846,7 @@ refsFromTypechecked ctx tsrc declAlts =
             -- the assignment is obvious.
             redirectsFromField (ExplicitAssignedRF, _) = Nothing
             -- Wildcard/punned record fields introduce a local var of the
-            -- same name as the record field. B
+            -- same name as the record field.
             redirectsFromField (_, f) = case hsRecFieldArg f of
                 -- We can only redirect patterns which deconstruct into
                 -- a single leaf var (otherwise it is ambigous which
@@ -1048,7 +1046,7 @@ toTickReference
 toTickReference ctx refContext declAlts (Reference name refKind span0) =
     let tick = nameInModuleToTick ctx name
     in TickReference (replaceWithPrimary tick) span0
-                      (replaceWithPrimary <$> refContext) refKind
+                     (replaceWithPrimary <$> refContext) refKind
         where
           replaceWithPrimary = altTickToPrimary declAlts
 
@@ -1118,4 +1116,5 @@ extractModuleName ctx m =
     in PkgModule p ms
 
 both :: (a -> b) -> (a,a) -> (b,b)
-both f (a,b) = (f a, f b)
+both f = f *** f
+
