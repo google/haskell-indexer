@@ -44,7 +44,7 @@ import Id (Id)
 import SrcLoc (Located, GenLocated(L), unLoc, getLoc)
 
 import HsBinds (HsBindLR(..), Sig(TypeSig), LHsBinds, abe_mono, abe_poly)
-import HsDecls (ConDecl(..), TyClDecl(DataDecl, SynDecl))
+import HsDecls (ConDecl(..), TyClDecl(ClassDecl, DataDecl, SynDecl))
 import HsTypes (HsType(HsTyVar), LHsType)
 import qualified HsTypes
 import Name (Name)
@@ -111,6 +111,13 @@ pattern TypeSigCompat names ty <-
     TypeSig names ty
 #else
     TypeSig names ty _
+#endif
+
+pattern ClassDeclCompat locName binders sigs <-
+#if __GLASGOW_HASKELL__ >= 802
+    ClassDecl _ locName binders _ _ sigs _ _ _ _ _
+#else
+    ClassDecl _ locName binders _ sigs _ _ _ _ _
 #endif
 
 #if __GLASGOW_HASKELL__ >= 800

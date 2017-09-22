@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 Google Inc.
 #
@@ -16,7 +16,8 @@
 
 # TODO(robinp): take these from outer env if present.
 GHC_KYTHE=ghc_kythe_wrapper
-VERIFIER=/opt/kythe/tools/verifier
+KYTHE_DIR="${KYTHE_DIR:-/opt/kythe}"
+VERIFIER=$KYTHE_DIR/tools/verifier
 
 BASIC="testdata/basic"
 
