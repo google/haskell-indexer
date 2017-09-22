@@ -333,11 +333,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         in alias:tyvars
     -- Typeclasses.
     -- TODO(robinpalotai): functional dependencies.
-#if __GLASGOW_HASKELL__ >= 802
-    dataDecls (L _ (ClassDecl _ locName binders _ _ sigs _ _ _ _ _)) =
-#else
-    dataDecls (L _ (ClassDecl _ locName binders _ sigs _ _ _ _ _)) =
-#endif
+    dataDecls (L _ (ClassDeclCompat locName binders sigs)) =
         let top = dataCtorLikeDecl locName
             tyvars = declsFromDataBinders binders
             fromSigs = concatMap (sigDecls . unLoc) sigs
