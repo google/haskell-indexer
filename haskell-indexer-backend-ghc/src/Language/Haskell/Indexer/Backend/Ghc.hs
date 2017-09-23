@@ -229,18 +229,6 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
       where
         mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
         fromLoc (L l n) = (n, l)
-        --
-        namesFromHsIbWc :: LHsSigWcType Name -> [Name]
-        namesFromHsIbWc =
-#if __GLASGOW_HASKELL__ >= 802
-            hswc_wcs
-#else
-            hsib_vars
-#endif
-        namesFromHsIbSig :: LHsSigType Name -> [Name]
-        namesFromHsIbSig = hsib_vars
-        namesFromHsWC :: LHsWcType Name -> [Name]
-        namesFromHsWC = hswc_wcs
     --
     namesFromForall :: HsType Name -> [Name]
     namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
@@ -339,12 +327,12 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             fromSigs = concatMap (sigDecls . unLoc) sigs
         in top:(fromSigs ++ tyvars)
       where
-        sigDecls (TypeSigCompat lnames ty) = map (dataLikeDecl ty) lnames
-#if __GLASGOW_HASKELL__ >= 800
-        sigDecls (ClassOpSig _ lnames ty) = map (dataLikeDecl ty) lnames
-#endif
-        -- TODO(robinpalotai): others?
-        sigDecls _ = []
+        -- For typeclasses, we emit the declaration from the method name in the
+        -- method signature (as opposed to normal functions, where we emit from
+        -- the definition's name).
+        sigDecls s = case clsSigBound s of
+            Just (ClsSigBound lnames ty) -> map (dataLikeDecl ty) lnames
+            Nothing -> []
     -- Other
     dataDecls _ = []
     --
