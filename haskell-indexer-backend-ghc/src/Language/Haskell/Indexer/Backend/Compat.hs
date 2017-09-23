@@ -14,6 +14,7 @@
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -39,15 +40,15 @@ import GHC (PackageKey)
 import SrcLoc (combineSrcSpans)
 #endif
 
-import HsExpr (HsExpr(..), HsRecordBinds)
-import Id (Id)
-import SrcLoc (Located, GenLocated(L), unLoc, getLoc)
-
-import HsBinds (HsBindLR(..), Sig(TypeSig), LHsBinds, abe_mono, abe_poly)
+import HsBinds (HsBindLR(..), Sig(..), LHsBinds, abe_mono, abe_poly)
 import HsDecls (ConDecl(..), TyClDecl(ClassDecl, DataDecl, SynDecl))
-import HsTypes (HsType(HsTyVar), LHsType)
+import HsExpr (HsExpr(..), HsRecordBinds)
 import qualified HsTypes
+import HsTypes (HsType(HsTyVar), LHsType)
+import Id (Id)
 import Name (Name)
+import Outputable (Outputable)
+import SrcLoc (Located, GenLocated(L), unLoc, getLoc)
 
 #if __GLASGOW_HASKELL__ >= 800
 showPackageName :: UnitId -> String
@@ -112,6 +113,34 @@ pattern TypeSigCompat names ty <-
 #else
     TypeSig names ty _
 #endif
+
+#if __GLASGOW_HASKELL__ >= 800
+-- | Monomorphising type so uniplate is happier.
+namesFromHsIbSig :: HsTypes.LHsSigType Name -> [Name]
+namesFromHsIbSig = HsTypes.hsib_vars
+
+namesFromHsWC :: HsTypes.LHsWcType Name -> [Name]
+namesFromHsWC = HsTypes.hswc_wcs
+
+namesFromHsIbWc :: HsTypes.LHsSigWcType Name -> [Name]
+namesFromHsIbWc =
+    -- No, can't use the above introduced names, because the types resolve
+    -- differently here. Type-level functions FTW.
+#if __GLASGOW_HASKELL__ >= 802
+    HsTypes.hswc_wcs
+#else
+    HsTypes.hsib_vars
+#endif
+#endif
+
+data ClsSigBound = forall a. Outputable a => ClsSigBound ![Located Name] a
+
+clsSigBound (TypeSigCompat ns ty) = Just (ClsSigBound ns ty)
+#if __GLASGOW_HASKELL__ >= 800
+clsSigBound (ClassOpSig _ ns ty) = Just (ClsSigBound ns ty)
+#endif
+-- TODO(robinpalotai): PatSynSig
+clsSigBound _ = Nothing
 
 pattern ClassDeclCompat locName binders sigs <-
 #if __GLASGOW_HASKELL__ >= 802
