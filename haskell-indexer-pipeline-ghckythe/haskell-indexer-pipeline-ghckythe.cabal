@@ -1,7 +1,7 @@
 name:                haskell-indexer-pipeline-ghckythe
 version:             0.1.0.0
 synopsis:            Gets GHC invocation arguments and streams Kythe entries.
-description:         See README.md.
+description:         Part of haskell-indexer, see top-level README.md for more info.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE

@@ -42,6 +42,10 @@ matrix:
     compiler: ": #GHC 8.0.2"
     addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
+  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=2.0 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.2.2"
+    addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
   - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
@@ -70,8 +74,8 @@ matrix:
     compiler: ": #stack lts-8 (GHC 8.0.2)"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  - env: BUILD=stack ARGS="--resolver nightly-2017-08-25"
-    compiler: ": #stack nightly (GHC 8.2.1)"
+  - env: BUILD=stack ARGS="--resolver lts-10"
+    compiler: ": #stack lts-10 (GHC 8.2.2)"
     addons: {apt: {packages: [libgmp-dev]}}
 
   # Nightly builds are allowed to fail

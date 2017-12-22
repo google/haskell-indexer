@@ -1,7 +1,7 @@
 name:                haskell-indexer-pathutil
 version:             0.1.0.0
 synopsis:            Utilities for dealing with filepaths.
-description:         See README.md.
+description:         Part of haskell-indexer, see top-level README.md.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE

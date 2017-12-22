@@ -2,7 +2,7 @@
 # docker image. See below why is that useful. If you are not interested in
 # doing a full-stackage index based on docker snapshot, feel free to use
 # other version.
-resolver: lts-6.30
+resolver: lts-6.30  # GHC 7.10.3
 
 packages:
 - haskell-indexer-backend-core

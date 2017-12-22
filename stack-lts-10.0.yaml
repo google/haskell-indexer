@@ -1,4 +1,4 @@
-resolver: nightly-2017-08-25
+resolver: lts-10.0  # GHC 8.2.2
 
 packages:
 - haskell-indexer-backend-core

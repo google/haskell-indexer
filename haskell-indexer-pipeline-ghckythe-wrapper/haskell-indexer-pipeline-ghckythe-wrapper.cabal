@@ -1,7 +1,8 @@
 name:                haskell-indexer-pipeline-ghckythe-wrapper
 version:             0.1.0.0
 synopsis:            Executable able to take GHC arguments and emitting Kythe entries.
-description:         See README.md.
+description:         Part of haskell-indexer, see top-level README.md for more info.
+                     Should be merged into ghckythe eventually.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE
