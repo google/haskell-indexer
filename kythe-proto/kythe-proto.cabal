@@ -1,7 +1,7 @@
 name:                kythe-proto
 version:             0.1.0.0
 synopsis:            Proto bindings for Kythe protobufs.
-description:         See README.md.
+description:         Part of haskell-indexer, see top-level README.md for more info.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE

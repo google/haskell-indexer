@@ -1,7 +1,7 @@
 name:                haskell-indexer-frontend-kythe
 version:             0.1.0.0
 synopsis:            Emits Kythe schema based on translation layer data.
-description:         See README.md.
+description:         Part of haskell-indexer, see top-level README.md for more info.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE
