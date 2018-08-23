@@ -17,7 +17,7 @@ library
   exposed-modules:     Language.Haskell.Indexer.Pipeline.GhcKythe
   build-depends:       base >=4.8 && <5
                      , bytestring
-                     , conduit
+                     , conduit >= 1.3
                      , filepath
                      , haskell-indexer-backend-core >= 0.1
                      , haskell-indexer-backend-ghc >= 0.1

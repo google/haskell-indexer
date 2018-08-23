@@ -23,7 +23,7 @@ import Control.Concurrent.MVar (MVar)
 import Control.Monad.Identity (runIdentity)
 import Control.Monad.Morph (lift, hoist)
 import qualified Data.ByteString as B
-import Data.Conduit (($$), (=$=), await, awaitForever, yield, Conduit, Sink)
+import Data.Conduit (($$), (=$=), await, awaitForever, yield, Conduit, Sink, transPipe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -51,7 +51,7 @@ ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
         -- Note: since this Conduit pipeline is pretty context-dependent, there
         -- is low chance of leak due to accidental sharing (see
         -- https://www.well-typed.com/blog/2016/09/sharing-conduit/).
-        hoist (return . runIdentity) (toKythe baseVName sourceText xref
+        transPipe (return . runIdentity) (toKythe baseVName sourceText xref
             -- Batch an ad-hoc number of entries to be emitted together.
             =$= chunksOf 1000)
             $$ sinkChunks
