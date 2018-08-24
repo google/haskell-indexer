@@ -15,11 +15,14 @@ extra-source-files:  third_party/kythe/kythe/proto/storage.proto
 
 library
   exposed-modules:     Proto.Kythe.Proto.Storage
+                     , Proto.Kythe.Proto.Storage_Fields
+  autogen-modules:     Proto.Kythe.Proto.Storage
+                     , Proto.Kythe.Proto.Storage_Fields
   build-depends:       base >=4.8 && <5
-                     , proto-lens-protoc >= 0.1
+                     , proto-lens-protoc >= 0.3.1.1
   default-language:    Haskell2010
 
 custom-setup
   setup-depends:       base >=4.8 && <5
                      , Cabal
-                     , proto-lens-protoc >= 0.1
+                     , proto-lens-protoc >= 0.3.1.1
