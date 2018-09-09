@@ -1,4 +1,4 @@
-resolver: lts-9.2  # GHC 8.0.2
+resolver: lts-11.22  # GHC 8.2.2
 
 packages:
 - haskell-indexer-backend-core
@@ -11,6 +11,15 @@ packages:
 - kythe-proto
 - kythe-schema
 - text-offset
+
+extra-deps:
+- conduit-1.3.0.3
+- proto-lens-protoc-0.3.1.2
+- proto-lens-combinators-0.1.0.11
+- proto-lens-0.3.1.0
+- lens-labels-0.2.0.1
+- mono-traversable-1.0.9.0
+- resourcet-1.2.1
 
 # Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
 # `proto-lens-protoc` in stack's local DB.  See:

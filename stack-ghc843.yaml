@@ -1,0 +1,31 @@
+resolver: lts-12.9  # GHC 8.4.3
+
+packages:
+- haskell-indexer-backend-core
+- haskell-indexer-backend-ghc
+- haskell-indexer-frontend-kythe
+- haskell-indexer-pathutil
+- haskell-indexer-pipeline-ghckythe
+- haskell-indexer-pipeline-ghckythe-wrapper
+- haskell-indexer-translate
+- kythe-proto
+- kythe-schema
+- text-offset
+
+extra-deps:
+- conduit-1.3.0.3
+- proto-lens-protoc-0.3.1.2
+- proto-lens-combinators-0.1.0.11
+- proto-lens-0.3.1.0
+- lens-labels-0.2.0.1
+- mono-traversable-1.0.9.0
+- resourcet-1.2.1
+
+# Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
+# `proto-lens-protoc` in stack's local DB.  See:
+# https://github.com/google/proto-lens/blob/master/README.md#using-cabal
+explicit-setup-deps:
+  "*": true
+
+nix:
+  packages: [gcc, protobuf3_2]

@@ -30,14 +30,18 @@ project_root=$(cd "$(dirname "$0")"; pwd)
 # thus we unregister the packages first to force rebuilding.
 # Note: `ghc-pkg unregister` does not unregister dependencies, so dependencies
 # won't be reindexed unless explicitly specified in the command line.
-for i in "${@:1}"; do
-  stack exec -- ghc-pkg latest "$i" &> /dev/null && stack exec \
-    -- ghc-pkg unregister --force "$i" || :
-done
+#
+# Note: disabling for now, as it was not a reliable way to force rebuild, also can break
+# the package database.
+#
+# for i in "${@:1}"; do
+#   stack exec -- ghc-pkg latest "$i" &> /dev/null && stack exec \
+#     -- ghc-pkg unregister --force "$i" || :
+# done
 
 # Put stack wrapper ghc script, ghc-pkg (from compiler-bin) and
 # ghc_kythe_wrapper (from local-install-root, invoked by wrappers/stack/ghc) on the PATH.
 # $(stack path --compiler-bin) is also on the PATH to make --system-ghc pick it instead
 # of system ghc (e.g. /usr/bin/ghc).
 PATH="$project_root/wrappers/stack:$(stack path --compiler-bin):$PATH:$(stack path --local-install-root)/bin" \
-  stack --system-ghc build "${@:1}"
+  stack --system-ghc --force-dirty build "${@:1}"
