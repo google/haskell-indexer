@@ -17,12 +17,20 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Module trying to expose a unified (or at least simplified) view of the GHC
 -- AST changes across multiple compiler versions.
 module Language.Haskell.Indexer.Backend.Compat where
 
 import Control.Arrow ((&&&))
+
+#if __GLASGOW_HASKELL__ >= 804
+import HsExtension
+#endif
+
+import CmdLineParser
 
 #if __GLASGOW_HASKELL__ >= 800
 import Module (UnitId, unitIdString)
@@ -47,8 +55,17 @@ import qualified HsTypes
 import HsTypes (HsType(HsTyVar), LHsType)
 import Id (Id)
 import Name (Name)
+import RdrName (RdrName)
 import Outputable (Outputable)
 import SrcLoc (Located, GenLocated(L), unLoc, getLoc)
+import GHC
+
+#if __GLASGOW_HASKELL__ < 804
+type GhcPs = RdrName
+type GhcRn = Name
+type GhcTc = Id
+type IdP a = a
+#endif
 
 #if __GLASGOW_HASKELL__ >= 800
 showPackageName :: UnitId -> String
@@ -76,7 +93,7 @@ mayUnLoc = id
 hsGroupInstDecls = hs_instds
 #endif
 
-pattern RecordConCompat :: Located Id -> HsRecordBinds Id -> HsExpr Id
+pattern RecordConCompat :: Located Id -> HsRecordBinds GhcTc -> HsExpr GhcTc
 pattern RecordConCompat lConId recBinds <-
 #if __GLASGOW_HASKELL__ >= 800
     RecordCon lConId _ _ recBinds
@@ -114,15 +131,17 @@ pattern TypeSigCompat names ty <-
     TypeSig names ty _
 #endif
 
+
+
 #if __GLASGOW_HASKELL__ >= 800
+namesFromHsIbWc :: HsTypes.LHsSigWcType GhcRn -> [Name]
+namesFromHsIbSig :: HsTypes.LHsSigType GhcRn -> [Name]
+namesFromHsWC :: HsTypes.LHsWcType GhcRn -> [Name]
 -- | Monomorphising type so uniplate is happier.
-namesFromHsIbSig :: HsTypes.LHsSigType Name -> [Name]
 namesFromHsIbSig = HsTypes.hsib_vars
 
-namesFromHsWC :: HsTypes.LHsWcType Name -> [Name]
 namesFromHsWC = HsTypes.hswc_wcs
 
-namesFromHsIbWc :: HsTypes.LHsSigWcType Name -> [Name]
 namesFromHsIbWc =
     -- No, can't use the above introduced names, because the types resolve
     -- differently here. Type-level functions FTW.
@@ -159,12 +178,23 @@ conDeclNames (ConDecl conNames _ _ _ _ _ _ _) = conNames
 data AbsBindsKind = NormalAbs | SigAbs
     deriving (Eq)
 
+#if __GLASGOW_HASKELL__ >= 804
+maybeAbsBinds :: HsBindLR a b
+              -> Maybe (LHsBinds a, [(IdP a, Maybe (IdP a))], AbsBindsKind)
+#else
 maybeAbsBinds :: HsBindLR a b
               -> Maybe (LHsBinds a, [(a, Maybe a)], AbsBindsKind)
-maybeAbsBinds (AbsBinds _ _ exports _ binds) =
+#endif
+maybeAbsBinds abs@(AbsBinds { abs_exports = exports,  abs_binds = binds}) =
     let ids = map (abe_poly &&& (Just . abe_mono)) exports
-    in Just $! (binds, ids, NormalAbs)
-#if __GLASGOW_HASKELL__ >= 800
+        binds_type =
+#if __GLASGOW_HASKELL__ >= 804
+          if abs_sig abs then SigAbs else NormalAbs
+#else
+          NormalAbs
+#endif
+    in Just $! (binds, ids, binds_type)
+#if __GLASGOW_HASKELL__ >= 800 && __GLASGOW_HASKELL__ < 804
 maybeAbsBinds (AbsBindsSig _ _ poly _ _ bind) =
     let binds = Bag.unitBag bind
         ids = [(poly, Nothing)]
@@ -178,12 +208,14 @@ pattern AbsBindsCompat binds ids abskind <-
 -- | Represents various spans of 'instance' declarations separately.
 data SplitInstType = SplitInstType
     { onlyClass :: !Name
-    , classAndInstance :: !(LHsType Name)
+    , classAndInstance :: !(LHsType GhcRn)
       -- ^ The location is properly set to the span of 'Cls Inst'
     }
 
+
+
 #if __GLASGOW_HASKELL__ >= 800
-mySplitInstanceType :: HsTypes.LHsSigType Name -> Maybe SplitInstType
+mySplitInstanceType :: HsTypes.LHsSigType GhcRn -> Maybe SplitInstType
 mySplitInstanceType ty = do
     let (_, body) = HsTypes.splitLHsForAllTy (HsTypes.hsSigType ty)
     clsName <- HsTypes.getLHsInstDeclClass_maybe ty
@@ -205,7 +237,7 @@ mySplitInstanceType ty = do
 #endif
 
 #if __GLASGOW_HASKELL__ >= 802
-hsTypeVarName :: HsType Name -> Maybe (Located Name)
+hsTypeVarName :: HsType GhcRn -> Maybe (Located Name)
 hsTypeVarName (HsTyVar _ n) = Just $! n
 #elif __GLASGOW_HASKELL__ >= 800
 hsTypeVarName :: HsType Name -> Maybe (Located Name)
@@ -215,4 +247,26 @@ hsTypeVarName :: HsType Name -> Maybe Name
 hsTypeVarName (HsTyVar n) = Just $! n
 #endif
 hsTypeVarName _ = Nothing
+
+
+getWarnMsg :: Warn -> String
+#if __GLASGOW_HASKELL__ >= 804
+getWarnMsg = unLoc . warnMsg
+#else
+getWarnMsg = unLoc
+
+type Warn = Located String
+#endif
+
+
+#if __GLASGOW_HASKELL__ < 804
+needsTemplateHaskellOrQQ = needsTemplateHaskell
+#endif
+
+
+#if __GLASGOW_HASKELL__ < 804
+mgModSummaries = id
+#endif
+
+
 

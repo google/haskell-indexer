@@ -24,6 +24,7 @@ import Lens.Family2 ((&), (.~))
 import qualified Language.Kythe.Schema.Raw as Raw
 -- TODO(robinpalotai): adapt path for open-source release.
 import qualified Proto.Kythe.Proto.Storage as K
+import qualified Proto.Kythe.Proto.Storage_Fields as K
 
 toEntryProto :: Raw.Entry -> K.Entry
 toEntryProto (Raw.EdgeE (Raw.Edge srcVName edgeName targetVName)) = def

@@ -55,6 +55,8 @@ import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
 import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
 import Language.Haskell.Indexer.Backend.AnalysisOptions (AnalysisOptions)
 
+import Language.Haskell.Indexer.Backend.Compat
+
 #if __GLASGOW_HASKELL__ < 800
 isHaskellishTarget :: (FilePath, Maybe Phase) -> Bool
 isHaskellishTarget (src,_) =
@@ -102,7 +104,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             unless (null errors) $
                 -- TODO(robinpalotai): error out.
                 printErr $ "Flag errors: "
-                              ++ L.intercalate ", " (map unLoc errors)
+                              ++ L.intercalate ", " (map getWarnMsg errors)
             return (unused, defaultTargetAndLink)
         ghcDflagOp (\d -> printErr $ show ("Codegen state after flag parse",
                               hscTarget d, ghcLink d))
@@ -132,7 +134,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         GHC.setTargets hsTargets
         -- Note: depanal caches current DynFlags into module dflags.
         graphPreliminary <- depanal [] False
-        if not (needsTemplateHaskell graphPreliminary)
+        if not (needsTemplateHaskellOrQQ graphPreliminary)
         then modifyDflags dontGenerateCode
         else do
             -- Actually very few TH usage needs code generation, but it's
@@ -146,7 +148,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- processed fine-grained, and modules downstream of TH-using
             -- ones surely don't need code generation.
             let anyOptimization = any (hasOpt . ms_hspp_opts)
-                                      graphPreliminary
+                                      (mgModSummaries graphPreliminary)
                   where hasOpt = (>0) . optLevel
             -- Foreign exports are not compatible with HscInterpreted,
             -- giving a compile panic.
@@ -186,7 +188,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         let env = GhcEnv (showSDoc usedDflags . ppr)
                          (showSDocForUser usedDflags neverQualify . ppr)
         let extractXref = analyseTypechecked env analysisOpts
-        mapM (parseModule >=> typecheckModule >=> extractXref) graph
+        mapM (parseModule >=> typecheckModule >=> extractXref) (mgModSummaries graph)
     mapM_ xrefSink xrefGraph
  where
     errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut

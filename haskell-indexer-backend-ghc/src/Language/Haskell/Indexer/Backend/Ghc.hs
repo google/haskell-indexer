@@ -20,6 +20,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-| Converts GHC typechecked AST into intermediate Analysed format.
 
 This module should not assume anything about the backend consuming the
@@ -230,9 +232,10 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         mkDecl (n,l) = declWithWrappedIdLoc typeStringyType (L l n)
         fromLoc (L l n) = (n, l)
     --
-    namesFromForall :: HsType Name -> [Name]
+    namesFromForall :: HsType GhcRn -> [Name]
     namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
       where
+        mkDecl :: LHsTyVarBndr GhcRn -> DeclAndAlt
         mkDecl binder =
           nameDeclAlt ctx (hsLTyVarName binder) Nothing typeStringyType
     namesFromForall _ = []
@@ -290,7 +293,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     --   from span.
 #if __GLASGOW_HASKELL__ >= 800
     hsqShim = hsq_explicit
-    declsFromDataBinders :: LHsQTyVars Name -> [DeclAndAlt]
+    declsFromDataBinders :: LHsQTyVars GhcRn -> [DeclAndAlt]
 #else
     hsqShim = hsq_tvs
     declsFromDataBinders :: LHsTyVarBndrs Name -> [DeclAndAlt]
@@ -298,11 +301,12 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     declsFromDataBinders = map (mkDecl . hsTyVarBinderName . unLoc) . hsqShim
       where
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
-    hsTyVarBinderName :: HsTyVarBndr id -> id
+    hsTyVarBinderName :: HsTyVarBndr id -> IdP id
     hsTyVarBinderName = \case
         UserTyVar n -> mayUnLoc n
         KindedTyVar n _ -> unLoc n
     -- Datatypes.
+    dataDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
     dataDecls (L _ (DataDeclCompat locName binders defn)) =
         let top = dataCtorLikeDecl locName
             ctors = map (conDecls . unLoc) . dd_cons $ defn
@@ -426,7 +430,7 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         refContext = Nothing
     in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
-    refsFromHsType :: LHsType Name -> Maybe Reference
+    refsFromHsType :: LHsType GhcRn -> Maybe Reference
     refsFromHsType (L l ty) = case hsTypeVarName ty of
         -- Basic variable at the leaves of type trees.
         -- Not only "real" type variables, but also type-level terms like
@@ -435,7 +439,7 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         -- TODO(robinpalotai): HsTyLit for type literals.
         _ -> Nothing
 
-    refsFromSignature :: LSig Name -> [Reference]
+    refsFromSignature :: LSig GhcRn -> [Reference]
     refsFromSignature (L _ sig) = case sig of
         TypeSigCompat names _ ->
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
@@ -477,7 +481,7 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
 importsFromRenamed :: GhcMonad m => ExtractCtx -> RenamedSource -> m [ModuleTick]
 importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
   where
-    mkImport :: GhcMonad m => LImportDecl Name -> m ModuleTick
+    mkImport :: GhcMonad m => LImportDecl GhcRn -> m ModuleTick
     mkImport (L _ implDecl) = do
       pkgModule <- (extractPkgModule ctx) . unLoc . ideclName $ implDecl
       let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
@@ -515,7 +519,7 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
 --
 -- The exported declarations of generated bindings are still useful.
 partitionTopLevelBindsByMatchGroupOrigin
-    :: TypecheckedSource -> ([LHsBindLR Id Id], [LHsBindLR Id Id])
+    :: TypecheckedSource -> ([LHsBindLR GhcTc GhcTc], [LHsBindLR GhcTc GhcTc])
 partitionTopLevelBindsByMatchGroupOrigin =
     partition (isFromSource . unLoc) . GHC.bagToList
   where
@@ -546,14 +550,14 @@ declsFromTypechecked ctx tsrc instDeclMods =
     modifyDecls = map (mapDeclAndAlt (modifyDecl instDeclMods))
 
 -- | Emits function declarations and pattern variables.
-deepDeclsFromTopBind :: ExtractCtx -> LHsBindLR Id Id -> [DeclAndAlt]
+deepDeclsFromTopBind :: ExtractCtx -> LHsBindLR GhcTc GhcTc -> [DeclAndAlt]
 deepDeclsFromTopBind ctx top =
     let hsbDecls = declsFromHsBinds ctx (universeWithParents top)
         -- ^ Warning, target type same as source, use universe (not Bi).
         patDecls = mapMaybe declsFromPat . universeBi $ top
     in hsbDecls ++ patDecls
   where
-    declsFromPat :: LPat Id -> Maybe DeclAndAlt
+    declsFromPat :: LPat GhcTc -> Maybe DeclAndAlt
     declsFromPat (L _ p) = case p of
         -- Eventually every interesting pattern ends in some variable capturing
         -- patterns.
@@ -594,9 +598,11 @@ universeWithParents a = ParentChild Nothing a : go a
 --
 -- Note: Typechecked fundecls contain record accessors, but not data
 -- constructors - latter are exported from the renamed source.
-declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind Id)] -> [DeclAndAlt]
+declsFromHsBinds :: ExtractCtx -> [ParentChild (LHsBind GhcTc)] -> [DeclAndAlt]
 declsFromHsBinds ctx = dedupByTick . concatMap go
   where
+    go :: ParentChild (GenLocated SrcSpan (HsBindLR GhcTc GhcTc))
+                      -> [DeclAndAlt]
     go (ParentChild (Just (L _ (AbsBindsCompat _ exports k)))
                     (L _ (FunBindCompat lVar _)))
         | k == NormalAbs = []
@@ -609,7 +615,7 @@ declsFromHsBinds ctx = dedupByTick . concatMap go
             in [DeclAndAlt primary (Just $! alternative)]
     go (ParentChild _ c) = absFunDeclsFromHsBind c
     --
-    absFunDeclsFromHsBind :: LHsBind Id -> [DeclAndAlt]
+    absFunDeclsFromHsBind :: LHsBind GhcTc -> [DeclAndAlt]
     absFunDeclsFromHsBind (L _ b) = case b of
         FunBindCompat (L idLoc funVar) _ ->
             let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
@@ -748,19 +754,19 @@ mkRedirect = (,)
 
 -- | If the arg is a top-level AbsBinds for a typeclass instance method,
 -- returns the AbsBinds below it - this is an irregularity in the AST.
-instanceAbsBinds :: LHsBindLR Id Id -> Maybe [LHsBindLR Id Id]
+instanceAbsBinds :: LHsBindLR GhcTc GhcTc -> Maybe [LHsBindLR GhcTc GhcTc]
 instanceAbsBinds (L _ (AbsBindsCompat binds exports _))
     | (isInstanceMethodVar . fst) `any` exports = Just $! GHC.bagToList binds
 instanceAbsBinds _ = Nothing
 
 -- | Pulls the AbsBinds below the top one up (if typeclass instance method), or
 -- leaves the original in place otherwise.
-pullInstanceAbsBindsToTop :: LHsBindLR Id Id -> [LHsBindLR Id Id]
+pullInstanceAbsBindsToTop :: LHsBindLR GhcTc GhcTc -> [LHsBindLR GhcTc GhcTc]
 pullInstanceAbsBindsToTop = (fromMaybe . return) <*> instanceAbsBinds
 
 -- | Returns (non-instance binds, instance-binds).
 partitionInstanceAbsBinds
-    :: [LHsBindLR Id Id] -> ([LHsBindLR Id Id], [LHsBindLR Id Id])
+    :: [LHsBindLR GhcTc GhcTc] -> ([LHsBindLR GhcTc GhcTc], [LHsBindLR GhcTc GhcTc])
     = both concat . partitionEithers . map instToRight
   where
     instToRight b = maybe (Left [b]) Right . instanceAbsBinds $ b
@@ -801,7 +807,7 @@ refsFromTypechecked ctx tsrc declAlts =
     --
     -- | Pattern bindings can also contain references - for example when a data
     -- constructor is pattern matched, the ctor name is referred.
-    refsFromPat :: LPat Id -> ([Reference], [Redirect])
+    refsFromPat :: LPat GhcTc -> ([Reference], [Redirect])
     refsFromPat (L _ p) = case p of
         -- ConPatOut (we are after typechecking).
         ConPatOut (L l conLike) _ _ _ _ details _ ->
@@ -854,7 +860,7 @@ refsFromTypechecked ctx tsrc declAlts =
         --      this is a potential decl (field)/ref (type of field) overlap.
         _ -> []
     --
-    refsFromExpr :: LHsExpr Id -> [Reference]
+    refsFromExpr :: LHsExpr GhcTc -> [Reference]
     refsFromExpr (L l x) = case x of
         -- Eventually all interesting value references point to a variable.
         HsVar vid ->
@@ -908,7 +914,7 @@ refsFromTypechecked ctx tsrc declAlts =
         -- single field, so it's ok to pass in an arbitrary DataCon to mine
         -- for reference targets.
 #if __GLASGOW_HASKELL__ >= 800
-        recordUpdRefs :: DataCon -> [LHsRecUpdField Id] -> [Reference]
+        recordUpdRefs :: DataCon -> [LHsRecUpdField GhcTc] -> [Reference]
 #else
         recordUpdRefs :: DataCon -> [LHsRecField Id (LHsExpr Id)] -> [Reference]
 #endif
@@ -928,7 +934,7 @@ refsFromTypechecked ctx tsrc declAlts =
       -- See comments on 'Redirect' about how this should be in the future.
 #if __GLASGOW_HASKELL__ >= 800
         recordFieldRefs
-            :: [GHC.FieldLabel] -> (RecFieldCat, HsRecField Id (LHsExpr Id))
+            :: [GHC.FieldLabel] -> (RecFieldCat, HsRecField GhcTc (LHsExpr GhcTc))
             -> [Reference]
         recordFieldRefs fieldLabels (cat, f) =
             let fieldNames = map GHC.flSelector fieldLabels
@@ -1019,7 +1025,7 @@ categorizedRecordFields recFields = do
               Nothing -> ExplicitAssignedRF
     return $! (cat, field)
 
-recordFieldName :: HsRecField Id arg -> Name
+recordFieldName :: HsRecField GhcTc arg -> Name
 recordFieldName = varName . unLoc . hsRecFieldId
 
 toTickReference
