@@ -34,10 +34,6 @@ matrix:
   include:
   # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
   # https://github.com/hvr/multi-ghc-travis
-  - env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 7.10.3"
-    addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
-
   - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
     compiler: ": #GHC 8.0.2"
     addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
@@ -58,28 +54,16 @@ matrix:
 
   # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
   # variable, such as using --stack-yaml to point to a different file.
-  - env: BUILD=stack ARGS=""
-    compiler: ": #stack.yaml"
+  - env: STACK_YAML=stack-ghc802.yaml BUILD=stack
+    compiler: ": #stack-ghc802.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  - env: STACK_YAML=stack-6.30.yaml BUILD=stack ARGS=""
-    compiler: ": #stack-6.30.yaml"
+  - env: STACK_YAML=stack-ghc822.yaml BUILD=stack
+    compiler: ": #stack-ghc822.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  - env: STACK_YAML=stack-6.30.yaml BUILD=stack ARGS="--resolver lts-6"
-    compiler: ": #stack-6.30.yaml lts-6 (GHC 7.10.3)"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: BUILD=stack ARGS="--resolver lts-7"
-    compiler: ": #stack lts-7 (GHC 8.0.1)"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: BUILD=stack ARGS="--resolver lts-8"
-    compiler: ": #stack lts-8 (GHC 8.0.2)"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: BUILD=stack ARGS="--resolver lts-10"
-    compiler: ": #stack lts-10 (GHC 8.2.2)"
+  - env: STACK_YAML=stack-ghc843.yaml BUILD=stack
+    compiler: ": #stack-ghc843.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
   # Nightly builds are allowed to fail
@@ -90,8 +74,8 @@ matrix:
   # Build on macOS in addition to Linux
   # For now we keep only a single osx build for smoke test.
   # Can consider adding more later.
-  - env: BUILD=stack ARGS=""
-    compiler: ": #stack.yaml (osx)"
+  - env: STACK_YAML=stack-ghc802.yaml BUILD=stack
+    compiler: ": #stack-ghc802.yaml (osx)"
     os: osx
 
   allow_failures:

@@ -8,10 +8,20 @@ This is not an official Google product.
 
 Indexing hosts:
  - Linux: supported - follow below documentation.
- - Windows, MacOS: didn't try - backend part likely compiles, wiring and Kythe frontend likely not (see #38).
+ - Windows, MacOS: didn't try - backend part likely compiles, wiring and Kythe
+   frontend likely not (see #38).
 
 Compilers:
-  - GHC 7.10.3, 8.0.1, 8.0.2, 8.2.1
+  - GHC 8.0.2
+  - GHC 8.2.2
+  - GHC 8.4.3
+
+Stackage:
+  - A recent LTS release corresponding to above compilers is supported.
+    See `stack-ghcXXX.yml` files.
+
+Previous compilers (from GHC 7.10.3) were supported at some point. Look at
+commit history or ping if interested.
   
 [![Build Status](https://travis-ci.org/google/haskell-indexer.svg?branch=master)](https://travis-ci.org/google/haskell-indexer)
 
@@ -58,13 +68,13 @@ Use the following to build and run tests:
 ```
 git clone --recursive https://github.com/google/haskell-indexer.git
 cd haskell-indexer
-# 8.17 -> GHC 8.0.2
-# 6.30 -> GHC 7.10.3
-export STACK_YAML=$(readlink -f stack-8.17.yaml)
+export STACK_YAML=$(readlink -f stack-ghc822.yaml)
 stack build && stack test
 # To test Kythe frontend:
 pushd kythe-verification; stack install && ./test.sh; popd
 ```
+
+To test all supported stack configurations, do `./run-ghc-tests.sh`.
 
 # Demo
 
