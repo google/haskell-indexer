@@ -95,14 +95,18 @@ hsGroupInstDecls = hs_instds
 
 pattern RecordConCompat :: Located Id -> HsRecordBinds GhcTc -> HsExpr GhcTc
 pattern RecordConCompat lConId recBinds <-
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    RecordCon _ lConId recBinds
+#elif __GLASGOW_HASKELL__ >= 800
     RecordCon lConId _ _ recBinds
 #else
     RecordCon lConId _ recBinds
 #endif
 
 pattern DataDeclCompat locName binders defn <-
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+    DataDecl _ locName binders _ defn
+#elif __GLASGOW_HASKELL__ >= 802
     DataDecl locName binders _ defn _ _
 #elif __GLASGOW_HASKELL__ >= 800
     DataDecl locName binders defn _ _
@@ -111,21 +115,27 @@ pattern DataDeclCompat locName binders defn <-
 #endif
 
 pattern SynDeclCompat locName binders <-
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+    SynDecl _ locName binders _ _
+#elif __GLASGOW_HASKELL__ >= 802
     SynDecl locName binders _ _ _
 #else
     SynDecl locName binders _ _
 #endif
 
 pattern FunBindCompat funId funMatches <-
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    FunBind _ funId funMatches _ _
+#elif __GLASGOW_HASKELL__ >= 800
     FunBind funId funMatches _ _ _
 #else
     FunBind funId _ funMatches _ _ _
 #endif
 
 pattern TypeSigCompat names ty <-
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+    TypeSig _ names ty
+#elif __GLASGOW_HASKELL__ >= 800
     TypeSig names ty
 #else
     TypeSig names ty _
@@ -138,37 +148,55 @@ namesFromHsIbWc :: HsTypes.LHsSigWcType GhcRn -> [Name]
 namesFromHsIbSig :: HsTypes.LHsSigType GhcRn -> [Name]
 namesFromHsWC :: HsTypes.LHsWcType GhcRn -> [Name]
 -- | Monomorphising type so uniplate is happier.
+#if __GLASGOW_HASKELL__ >= 806
+namesFromHsIbSig = hsib_vars . HsTypes.hsib_ext
+#else
 namesFromHsIbSig = HsTypes.hsib_vars
+#endif
 
+#if __GLASGOW_HASKELL__ <= 804
 namesFromHsWC = HsTypes.hswc_wcs
+#else
+namesFromHsWC = HsTypes.hswc_ext
+#endif
 
 namesFromHsIbWc =
     -- No, can't use the above introduced names, because the types resolve
     -- differently here. Type-level functions FTW.
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ <= 800
+    HsTypes.hsib_vars
+#elif __GLASGOW_HASKELL__ <= 802
     HsTypes.hswc_wcs
 #else
-    HsTypes.hsib_vars
+    HsTypes.hswc_ext
 #endif
 #endif
 
 data ClsSigBound = forall a. Outputable a => ClsSigBound ![Located Name] a
 
 clsSigBound (TypeSigCompat ns ty) = Just (ClsSigBound ns ty)
-#if __GLASGOW_HASKELL__ >= 800
-clsSigBound (ClassOpSig _ ns ty) = Just (ClsSigBound ns ty)
+#if __GLASGOW_HASKELL__ >= 806
+clsSigBound (ClassOpSig _ _ ns ty)
+#elif __GLASGOW_HASKELL__ >= 800
+clsSigBound (ClassOpSig _ ns ty)
 #endif
+  = Just (ClsSigBound ns ty)
 -- TODO(robinpalotai): PatSynSig
 clsSigBound _ = Nothing
 
 pattern ClassDeclCompat locName binders sigs <-
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+    ClassDecl _ _ locName binders _ _ sigs _ _ _ _
+#elif __GLASGOW_HASKELL__ >= 802
     ClassDecl _ locName binders _ _ sigs _ _ _ _ _
 #else
     ClassDecl _ locName binders _ sigs _ _ _ _ _
 #endif
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 806
+conDeclNames (ConDeclH98 { con_name = conName })  = [conName]
+conDeclNames (ConDeclGADT { con_names = conNames }) = conNames
+#elif __GLASGOW_HASKELL__ >= 800
 conDeclNames (ConDeclH98 conName _ _ _ _) = [conName]
 conDeclNames (ConDeclGADT conNames _ _) = conNames
 #else
@@ -236,7 +264,10 @@ mySplitInstanceType ty = do
         }
 #endif
 
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 806
+hsTypeVarName :: HsType GhcRn -> Maybe (Located Name)
+hsTypeVarName (HsTyVar _ _ n) = Just $! n
+#elif __GLASGOW_HASKELL__ >= 802
 hsTypeVarName :: HsType GhcRn -> Maybe (Located Name)
 hsTypeVarName (HsTyVar _ n) = Just $! n
 #elif __GLASGOW_HASKELL__ >= 800
@@ -267,6 +298,118 @@ needsTemplateHaskellOrQQ = needsTemplateHaskell
 #if __GLASGOW_HASKELL__ < 804
 mgModSummaries = id
 #endif
+
+#if __GLASGOW_HASKELL__ < 806
+valBinds valds =
+  case valds of
+    ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
+    ValBindsIn _ lsigs ->
+      error "should not hit ValBindsIn when accessing renamed AST"
+
+
+pattern ValBindsCompat  lsigs <- (valBinds -> lsigs)
+#else
+pattern ValBindsCompat lsigs <- XValBindsLR (NValBinds _ lsigs)
+#endif
+
+#if __GLASGOW_HASKELL__ < 806
+pattern HsForAllTyCompat binders <- HsForAllTy binders _
+#else
+pattern HsForAllTyCompat binders <- HsForAllTy _ binders _
+#endif
+
+#if __GLASGOW_HASKELL__ < 806
+pattern UserTyVarCompat n <- UserTyVar n
+pattern KindedTyVarCompat n <- KindedTyVar n _
+#else
+pattern UserTyVarCompat n <- UserTyVar _ n
+pattern KindedTyVarCompat n <- KindedTyVar _ n _
+#endif
+
+pattern HsVarCompat v <-
+#if __GLASGOW_HASKELL__ < 806
+  HsVar v
+#else
+  HsVar _ v
+#endif
+
+pattern HsWrapCompat e <-
+#if __GLASGOW_HASKELL__ < 806
+  HsWrap _ e
+#else
+  HsWrap _ _ e
+#endif
+
+pattern HsParCompat e <-
+#if __GLASGOW_HASKELL__ < 806
+  HsPar e
+#else
+  HsPar _ e
+#endif
+
+pattern SectionLCompat e <-
+#if __GLASGOW_HASKELL__ < 806
+  SectionL _ e
+#else
+  SectionL _ _ e
+#endif
+
+pattern SectionRCompat e <-
+#if __GLASGOW_HASKELL__ < 806
+  SectionR _ e
+#else
+  SectionR _ _ e
+#endif
+
+pattern HsAppCompat f <-
+#if __GLASGOW_HASKELL__ < 806
+  HsApp f _
+#else
+  HsApp _ f _
+#endif
+
+pattern VarPatCompat v <-
+#if __GLASGOW_HASKELL__ < 806
+  VarPat v
+#else
+  VarPat _ v
+#endif
+
+pattern HsConLikeOutCompat v <-
+#if __GLASGOW_HASKELL__ < 806
+  HsConLikeOut v
+#else
+  HsConLikeOut _ v
+#endif
+
+pattern RecordUpdCompat r dcs <-
+#if __GLASGOW_HASKELL__ < 806
+  RecordUpd _ r dcs _ _ _
+#else
+  RecordUpd (RecordUpdTc dcs _ _ _) _ r
+#endif
+
+pattern AsPatCompat asVar <-
+#if __GLASGOW_HASKELL__ < 806
+  AsPat (L _ asVar) _
+#else
+  AsPat _ (L _ asVar) _
+#endif
+
+pattern ClsInstDCompat v <-
+#if __GLASGOW_HASKELL__ < 806
+  ClsInstD v
+#else
+  ClsInstD _ v
+#endif
+
+pattern ClsInstDeclCompat lty lbinds  <-
+#if __GLASGOW_HASKELL__ < 806
+  ClsInstDecl lty lbinds _ _ _ _
+#else
+  ClsInstDecl _ lty lbinds _ _ _ _
+#endif
+
 
 
 

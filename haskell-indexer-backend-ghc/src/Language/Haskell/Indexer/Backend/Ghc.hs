@@ -233,7 +233,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         fromLoc (L l n) = (n, l)
     --
     namesFromForall :: HsType GhcRn -> [Name]
-    namesFromForall (HsForAllTy binders _) = map hsLTyVarName binders
+    namesFromForall (HsForAllTyCompat binders) = map hsLTyVarName binders
       where
         mkDecl :: LHsTyVarBndr GhcRn -> DeclAndAlt
         mkDecl binder =
@@ -303,8 +303,8 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
     hsTyVarBinderName :: HsTyVarBndr id -> IdP id
     hsTyVarBinderName = \case
-        UserTyVar n -> mayUnLoc n
-        KindedTyVar n _ -> unLoc n
+        UserTyVarCompat n -> mayUnLoc n
+        KindedTyVarCompat n -> unLoc n
     -- Datatypes.
     dataDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
     dataDecls (L _ (DataDeclCompat locName binders defn)) =
@@ -340,7 +340,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     -- Other
     dataDecls _ = []
     --
-    instDecls (L wholeSrcSpan (ClsInstD (ClsInstDecl lty lbinds _ _ _ _))) = do
+    instDecls (L wholeSrcSpan (ClsInstDCompat (ClsInstDeclCompat lty lbinds))) = do
         -- 1) We emit the instance declaration with the idSpan set to
         --    the "<cls> <inst>" string ad-hocly, since we don't have a better
         --    name. But this can overlap with other name spans (class,
@@ -424,9 +424,7 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
         sigRefs = case hs_valds hsGroup of
-            ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
-            ValBindsIn _ lsigs ->
-                error "should not hit ValBindsIn when accessing renamed AST"
+            ValBindsCompat lsigs -> concatMap refsFromSignature lsigs
         refContext = Nothing
     in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
   where
@@ -454,7 +452,7 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
     in map replaceAltTicks (methodOverrides ++ classInstances)
   where
     overrides = \case
-        (L _ (ClsInstD (ClsInstDecl _ lbinds _ _ _ _))) ->
+        (L _ (ClsInstDCompat (ClsInstDeclCompat _ lbinds))) ->
             mapMaybe (methodOverride . unLoc) (GHC.bagToList lbinds)
         _ -> []
       where
@@ -466,7 +464,7 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
             _ -> Nothing
     --
     instances = \case
-        (L _(ClsInstD (ClsInstDecl lty _ _ _ _ _))) -> do
+        (L _(ClsInstDCompat (ClsInstDeclCompat lty _))) -> do
             splitType <- mySplitInstanceType lty
             let clsTick = nameInModuleToTick ctx (onlyClass splitType)
                 instTick = makeInstanceTick ctx splitType
@@ -561,11 +559,11 @@ deepDeclsFromTopBind ctx top =
     declsFromPat (L _ p) = case p of
         -- Eventually every interesting pattern ends in some variable capturing
         -- patterns.
-        VarPat v -> Just $! varDeclNoAlt (mayUnLoc v)
+        VarPatCompat v -> Just $! varDeclNoAlt (mayUnLoc v)
         -- Below are special patterns that declare things outside an LPat, so
         -- universe traversal wouldn't capture them. We emit declarations for
         -- these special things (Pats are taken care by above case).
-        AsPat (L _ asVar) _ -> Just $! varDeclNoAlt asVar
+        AsPatCompat asVar -> Just $! varDeclNoAlt asVar
         -- Universe covers the rest.
         _ -> Nothing
       where
@@ -843,7 +841,7 @@ refsFromTypechecked ctx tsrc declAlts =
                 -- deconstructed part to redirect).
                 -- TODO(robinpalotai): follow a whitelisted chain of
                 --   decorative patterns (BangPat, ParPat etc) too.
-                L _ (VarPat var) -> Just $!
+                L _ (VarPatCompat var) -> Just $!
                     mkRedirect (varName $ mayUnLoc var) (recordFieldName f)
                 -- TODO(robinpalotai): could emit a reference from the span
                 --   of the complex pattern match too, probably marking it
@@ -863,7 +861,7 @@ refsFromTypechecked ctx tsrc declAlts =
     refsFromExpr :: LHsExpr GhcTc -> [Reference]
     refsFromExpr (L l x) = case x of
         -- Eventually all interesting value references point to a variable.
-        HsVar vid ->
+        HsVarCompat vid ->
             let n = case specialVar (mayUnLoc vid) of
                     -- See notes in DataCon.hs. We exported the declaration
                     -- from the renamed source, which has the name of the
@@ -872,30 +870,30 @@ refsFromTypechecked ctx tsrc declAlts =
                     _ -> varName (mayUnLoc vid)
             in maybeToList (give ctx (nameLocToRef n Ref l))
         -- Special handling for call-like expressions. We emit an extra ref
-        -- with kind Call, then the duplicate Ref produced by the HsVar match
+        -- with kind Call, then the duplicate Ref produced by the HsVarCompat match
         -- will be removed in 'postprocessCalls'.
         OpApp _ op _ _ -> callRef op
-        SectionL _ op  -> callRef op
-        SectionR op _  -> callRef op
-        HsApp f _      -> callRef f
+        SectionLCompat op  -> callRef op
+        SectionRCompat op  -> callRef op
+        HsAppCompat f       -> callRef f
         -- Below experssions contain refs outside of LHsExpr, so traversal
         -- would miss them.
         --
         -- Note: What is an EAsPat, and what is its first id?
         --
-        HsWrap _ e -> refsFromExpr (L l e)  -- 'e' is just HsExpr, not LHsExpr.
+        HsWrapCompat e -> refsFromExpr (L l e)  -- 'e' is just HsExpr, not LHsExpr.
 #if __GLASGOW_HASKELL__ >= 802
-        HsConLikeOut conLike ->
-            -- From GHC 8.2.1, ctor reference is not just a simple HsVar.
+        HsConLikeOutCompat conLike ->
+            -- From GHC 8.2.1, ctor reference is not just a simple HsVarCompat.
             let name = ConLike.conLikeName conLike
             in maybeToList (give ctx (nameLocToRef name Ref l))
 #endif
         RecordConCompat locDataConId r -> recordConRefs locDataConId r
 #if __GLASGOW_HASKELL__ >= 800
         -- TODO(robinp): emit ref to all the possible constructors (also below).
-        RecordUpd _ r (ConLike.RealDataCon dc:_) _ _ _   -> recordUpdRefs dc r
+        RecordUpdCompat r (ConLike.RealDataCon dc:_) -> recordUpdRefs dc r
 #else
-        RecordUpd _ r (dc:_) _ _   -> recordUpdRefs dc (rec_flds r)
+        RecordUpdCompat r (dc:_)  -> recordUpdRefs dc (rec_flds r)
 #endif
         -- Others handled by universe.
         _ -> []
@@ -969,19 +967,19 @@ refsFromTypechecked ctx tsrc declAlts =
                     -- TODO(robinpalotai): maybe follow chain of decorative
                     --   exprs that still have a single var at the leaf.
                     --   Not sure it can happen, test on AST.
-                    L _ (HsVar v) -> give ctx $
+                    L _ (HsVarCompat v) -> give ctx $
                         nameLocToRef target Ref
                                      (nameSrcSpan . varName . mayUnLoc $ v)
                     _ -> Nothing
         callRef (L appl e) = case e of
             -- Base case, but practically not occuring directly.
-            HsVar v -> maybeToList $
+            HsVarCompat v -> maybeToList $
                 give ctx (nameLocToRef (varName (mayUnLoc v)) Call appl)
             -- After typechecking this happens in practice.
-            HsWrap _ expr -> callRef (L appl expr)
+            HsWrapCompat expr -> callRef (L appl expr)
             -- The AST omits parens if precedence doesn't require them, but
             -- adding this just in case.
-            HsPar lexpr -> callRef lexpr
+            HsParCompat lexpr -> callRef lexpr
             _ -> []
     -- | Drops Ref-s which also have a Call emitted, also replaces the reference
     -- targets if a suitable Redirect is found.

@@ -18,7 +18,7 @@ module Language.Kythe.Schema.Raw.Proto
     ( toEntryProto
     ) where
 
-import Data.Default (def)
+import Data.ProtoLens
 import Lens.Family2 ((&), (.~))
 
 import qualified Language.Kythe.Schema.Raw as Raw
@@ -27,18 +27,18 @@ import qualified Proto.Kythe.Proto.Storage as K
 import qualified Proto.Kythe.Proto.Storage_Fields as K
 
 toEntryProto :: Raw.Entry -> K.Entry
-toEntryProto (Raw.EdgeE (Raw.Edge srcVName edgeName targetVName)) = def
+toEntryProto (Raw.EdgeE (Raw.Edge srcVName edgeName targetVName)) = defMessage
     & K.source   .~ toVNameProto srcVName
     & K.edgeKind .~ edgeName
     & K.target   .~ toVNameProto targetVName
     & K.factName .~ "/"  -- expected by Kythe tools.
-toEntryProto (Raw.FactE (Raw.Fact vname factName factValue)) = def
+toEntryProto (Raw.FactE (Raw.Fact vname factName factValue)) = defMessage
     & K.source    .~ toVNameProto vname
     & K.factName  .~ factName
     & K.factValue .~ factValue
 
 toVNameProto :: Raw.VName -> K.VName
-toVNameProto (Raw.VName sig corpus root path lang) = def
+toVNameProto (Raw.VName sig corpus root path lang) = defMessage
     & K.signature .~ sig
     & K.corpus    .~ corpus
     & K.root      .~ root
