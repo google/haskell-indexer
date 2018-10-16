@@ -375,11 +375,14 @@ pattern VarPatCompat v <-
   VarPat _ v
 #endif
 
+
+#if __GLASGOW_HASKELL__ >= 802
 pattern HsConLikeOutCompat v <-
 #if __GLASGOW_HASKELL__ < 806
   HsConLikeOut v
-#else
+#elif __GLASGOW_HASKELL__
   HsConLikeOut _ v
+#endif
 #endif
 
 pattern RecordUpdCompat r dcs <-
