@@ -23,7 +23,7 @@ library
                      , data-default
                      , kythe-proto
                      , lens-family
-                     , proto-lens >= 0.1
-                     , proto-lens-combinators == 0.1.*
+                     , proto-lens >= 0.4
+                     , proto-lens-combinators == 0.4.*
                      , text
   default-language:    Haskell2010
