@@ -14,10 +14,11 @@ packages:
 
 extra-deps:
 - conduit-1.3.0.3
-- proto-lens-protoc-0.3.1.2
-- proto-lens-combinators-0.1.0.11
-- proto-lens-0.3.1.0
-- lens-labels-0.2.0.1
+- proto-lens-protoc-0.4.0.1
+- proto-lens-setup-0.4.0.1
+- proto-lens-runtime-0.4.0.1
+- proto-lens-combinators-0.4.0.1
+- proto-lens-0.3.0.1
 - mono-traversable-1.0.9.0
 - resourcet-1.2.1
 
