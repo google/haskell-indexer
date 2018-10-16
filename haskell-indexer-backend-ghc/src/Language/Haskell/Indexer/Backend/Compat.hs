@@ -165,7 +165,7 @@ namesFromHsIbWc =
     -- differently here. Type-level functions FTW.
 #if __GLASGOW_HASKELL__ <= 800
     HsTypes.hsib_vars
-#elif __GLASGOW_HASKELL__ <= 806
+#elif __GLASGOW_HASKELL__ <= 804
     HsTypes.hswc_wcs
 #else
     HsTypes.hswc_ext
