@@ -18,7 +18,7 @@ extra-deps:
 - proto-lens-setup-0.4.0.1
 - proto-lens-runtime-0.4.0.1
 - proto-lens-combinators-0.4.0.1
-- proto-lens-0.3.0.1
+- proto-lens-0.4.0.1
 - mono-traversable-1.0.9.0
 - resourcet-1.2.1
 
