@@ -165,7 +165,7 @@ namesFromHsIbWc =
     -- differently here. Type-level functions FTW.
 #if __GLASGOW_HASKELL__ <= 800
     HsTypes.hsib_vars
-#elif __GLASGOW_HASKELL__ <= 802
+#elif __GLASGOW_HASKELL__ <= 806
     HsTypes.hswc_wcs
 #else
     HsTypes.hswc_ext
@@ -302,7 +302,7 @@ mgModSummaries = id
 #if __GLASGOW_HASKELL__ < 806
 valBinds valds =
   case valds of
-    ValBindsOut _ lsigs -> concatMap refsFromSignature lsigs
+    ValBindsOut _ lsigs -> lsigs
     ValBindsIn _ lsigs ->
       error "should not hit ValBindsIn when accessing renamed AST"
 
