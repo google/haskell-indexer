@@ -15,14 +15,16 @@ Compilers:
   - GHC 8.0.2
   - GHC 8.2.2
   - GHC 8.4.3
+  - GHC 8.6.1
 
 Stackage:
   - A recent LTS release corresponding to above compilers is supported.
     See `stack-ghcXXX.yml` files.
 
-Previous compilers (from GHC 7.10.3) were supported at some point. Look at
-commit history or ping if interested.
-  
+Previous compilers were supported at some point. Checkout an old repository
+state if interested:
+  - [GHC 7.10.3](https://github.com/google/haskell-indexer/tree/last-ghc-7.10.3)
+
 [![Build Status](https://travis-ci.org/google/haskell-indexer.svg?branch=master)](https://travis-ci.org/google/haskell-indexer)
 
 # Installation
