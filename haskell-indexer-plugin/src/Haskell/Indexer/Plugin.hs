@@ -16,10 +16,16 @@ import Language.Haskell.Indexer.Translate
 import Language.Haskell.Indexer.Args
 
 import System.IO
+import System.FilePath
+import System.Directory
 
 plugin :: Plugin
 plugin = defaultPlugin
           { typeCheckResultAction = install }
+
+mkPath :: FilePath -> Module -> FilePath
+mkPath fp m
+  = fp </> (moduleNameString (moduleName m) ++ (show (moduleUnitId m)))
 
 install :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 install opts ms tc_gbl = do
@@ -30,7 +36,9 @@ install opts ms tc_gbl = do
       let outdir = case flagOutput flags of
                        Nothing -> "haskell-indexer"
                        Just o -> o
-      h <- liftIO (openFile outdir WriteMode)
+          outpath = mkPath outdir (ms_mod ms)
+      liftIO $ createDirectoryIfMissing False outdir
+      h <- liftIO (openFile outpath WriteMode)
       let env = GhcEnv (showSDoc dflags . ppr)
                        (showSDocForUser dflags neverQualify . ppr)
 
