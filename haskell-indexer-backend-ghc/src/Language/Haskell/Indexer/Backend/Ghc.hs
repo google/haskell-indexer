@@ -29,6 +29,7 @@ Analysed format (so various backends can be plugged).
 -}
 module Language.Haskell.Indexer.Backend.Ghc
     ( analyseTypechecked
+    , analyseTypechecked'
     , AnalysisOptions(..)
     ) where
 
@@ -100,15 +101,29 @@ data ExtractCtx = ExtractCtx
     }
 
 analyseTypechecked :: GhcMonad m => GhcEnv -> AnalysisOptions -> TypecheckedModule -> m XRef
-analyseTypechecked ghcEnv opts tm = do
-    let modSummary = pm_mod_summary . tm_parsed_module $ tm
+analyseTypechecked ghcEnv opts tm =
+  let
+        modSummary = pm_mod_summary . tm_parsed_module $ tm
+        renSource = tm_renamed_source tm  :: Maybe RenamedSource
+        tcSource = tm_typechecked_source tm
+        moduleTick ctx = give ctx $
+            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
+                         (extractModuleName ctx (ecModule ctx))
+  in analyseTypechecked' ghcEnv opts modSummary renSource tcSource moduleTick
+
+analyseTypechecked'
+  :: GhcMonad m => GhcEnv -> AnalysisOptions
+  -> ModSummary -> Maybe RenamedSource -> LHsBinds GhcTc
+  -> (ExtractCtx -> ModuleTick)
+  -> m XRef
+analyseTypechecked' ghcEnv opts modSummary renSource tcSource fmoduleTick = do
+    let
+        ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
+        moduleTick = fmoduleTick ctx
         -- Analysed modules always arrive as file references in practice.
         modFile = T.pack $!
                       fromMaybe "?" (ml_hs_file . ms_location $ modSummary)
         strippedModFile = SourcePath (aoFilePathTransform opts modFile)
-        ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
-        renSource = tm_renamed_source tm  :: Maybe RenamedSource
-        tcSource = tm_typechecked_source tm
         declsAlts =
             let (fromRenamed, declMods) =
                     fromMaybe mempty (declsFromRenamed ctx <$> renSource)
@@ -121,9 +136,6 @@ analyseTypechecked ghcEnv opts tm = do
             renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
         rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
         decls = map daDecl declsAlts
-        moduleTick = give ctx $
-            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
-                         (extractModuleName ctx (ecModule ctx))
     imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
     return $ XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
             decls refs rels imports
@@ -133,6 +145,8 @@ analyseTypechecked ghcEnv opts tm = do
       where
         toPair (DeclAndAlt d (Just alt)) = Just (alt, declTick d)
         toPair _ = Nothing
+
+
 
 -- | Bundles a declaration with an alternative reference, if any.
 -- The alternate reference can be used by other AST elements to refer to the
