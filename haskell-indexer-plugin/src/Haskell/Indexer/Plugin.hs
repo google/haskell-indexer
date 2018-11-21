@@ -21,7 +21,8 @@ import System.Directory
 
 plugin :: Plugin
 plugin = defaultPlugin
-          { typeCheckResultAction = install }
+          { renamedResultAction   = keepRenamedSource
+          , typeCheckResultAction = install }
 
 mkPath :: FilePath -> Module -> FilePath
 mkPath fp m
