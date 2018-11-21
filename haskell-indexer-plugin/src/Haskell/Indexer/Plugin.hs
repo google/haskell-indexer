@@ -42,11 +42,13 @@ install opts ms tc_gbl = do
       let env = GhcEnv (showSDoc dflags . ppr)
                        (showSDocForUser dflags neverQualify . ppr)
 
+
       let action aoes =
             unGhc (analyseTypechecked' env aoes ms
                     (getRenamedStuff tc_gbl)
                     (tcg_binds tc_gbl)
-                    (\_ -> ModuleTick (PkgModule "abc" "def") Nothing))
+                    -- TODO: Fill in the Nothing with the correct span
+                    (ms_mod ms, Nothing))
                     session
       liftIO $ kythePlugin h action flags
       return tc_gbl

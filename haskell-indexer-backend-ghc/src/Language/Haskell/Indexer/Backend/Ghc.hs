@@ -106,20 +106,21 @@ analyseTypechecked ghcEnv opts tm =
         modSummary = pm_mod_summary . tm_parsed_module $ tm
         renSource = tm_renamed_source tm  :: Maybe RenamedSource
         tcSource = tm_typechecked_source tm
-        moduleTick ctx = give ctx $
-            mkModuleTick (pm_parsed_source (tm_parsed_module tm))
-                         (extractModuleName ctx (ecModule ctx))
-  in analyseTypechecked' ghcEnv opts modSummary renSource tcSource moduleTick
+        moduleSpan =
+          fmap getLoc . hsmodName . unLoc . pm_parsed_source
+            $ tm_parsed_module tm
+        moduleInfo = (ms_mod modSummary, moduleSpan)
+  in analyseTypechecked' ghcEnv opts modSummary renSource tcSource moduleInfo
 
 analyseTypechecked'
   :: GhcMonad m => GhcEnv -> AnalysisOptions
   -> ModSummary -> Maybe RenamedSource -> LHsBinds GhcTc
-  -> (ExtractCtx -> ModuleTick)
+  -> (Module, Maybe SrcSpan)
   -> m XRef
-analyseTypechecked' ghcEnv opts modSummary renSource tcSource fmoduleTick = do
+analyseTypechecked' ghcEnv opts modSummary renSource tcSource (mod, mspan) = do
     let
         ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
-        moduleTick = fmoduleTick ctx
+        moduleTick = give ctx $ mkModuleTick mspan mod
         -- Analysed modules always arrive as file references in practice.
         modFile = T.pack $!
                       fromMaybe "?" (ml_hs_file . ms_location $ modSummary)
@@ -196,10 +197,12 @@ modifyDecl declMods decl =
         withExtra (\e -> e {methodForInstance = Just $! i}) decl
 
 -- | Bundles up the module name with its source span.
-mkModuleTick :: (Given ExtractCtx) => ParsedSource -> PkgModule -> ModuleTick
-mkModuleTick lhsm pm = ModuleTick pm moduleNameSpan
+mkModuleTick :: (Given ExtractCtx) => Maybe SrcSpan -> Module -> ModuleTick
+mkModuleTick span mod = ModuleTick pkgmodule moduleNameSpan
   where
-    moduleNameSpan = (fmap getLoc . hsmodName . unLoc $ lhsm) >>= srcSpanToSpan
+    moduleNameSpan = srcSpanToSpan =<< span
+    pkgmodule = extractModuleName given mod
+
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
