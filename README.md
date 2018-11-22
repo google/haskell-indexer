@@ -78,6 +78,11 @@ pushd kythe-verification; stack install && ./test.sh; popd
 
 To test all supported stack configurations, do `./run-ghc-tests.sh`.
 
+# Plugin
+
+If you want to use the indexer GHC plugin with `stack`, see
+[stack-example/README.md](stack-example/README.md).
+
 # Demo
 
 To index a few packages, run:
