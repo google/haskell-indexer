@@ -32,12 +32,18 @@ $ ./gen-ghc-wrapper.sh ghc_wrapper "$(stack path --compiler-exe)" \
   "$(stack path --snapshot-pkg-db)"
 ```
 
-Now we can index a package and all of its dependencies with
+Now we can index a package and almost all of its dependencies with
 ```bash
 $ export INDEXER_OUTPUT_DIR=/tmp/indexer-output
 $ PATH=$(pwd)/ghc_wrapper:$PATH \
   STACK_ROOT=$HOME/.stack-indexer stack --system-ghc build <pkg>
 ```
+We direct `stack` to use the `ghc` wrapper by incluiding it in the
+`PATH` and passing the flag `--system-ghc` to it.
+
+The purpose of using `STACK_ROOT` above, is to rebuild and index even 
+the dependencies of `haskell-indexer-plugin`. If you are not
+interested in those, then using `STACK_ROOT` can be omitted.
 
 Packages which use Safe Haskell [can't be indexed currently][sh-issue].
 They can be skipped with
