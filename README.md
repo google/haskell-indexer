@@ -73,7 +73,8 @@ plugin.
 For instruction on how to install and use the plugin with `stack`, see
 [stack-example/README.md](stack-example/README.md).
 
-The following GHC options are relevant after the plugin is installed.
+If you are using some other build system, the following GHC options are
+relevant after the plugin is installed.
 
 * `-package-db <db_path>`: Tells the package database where the plugin has
   been installed. It may be used more than once if the plugin dependencies
