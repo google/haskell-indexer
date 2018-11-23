@@ -63,22 +63,7 @@ unzip -j protoc-*-linux-x86_64.zip bin/protoc -d /usr/local/bin/
 > If you use have Nix installed and you use `stack --nix`, you do not need to do
 > this.
 
-# Build the project
-
-Use the following to build and run tests:
-
-```
-git clone --recursive https://github.com/google/haskell-indexer.git
-cd haskell-indexer
-export STACK_YAML=$(readlink -f stack-ghc822.yaml)
-stack build && stack test
-# To test Kythe frontend:
-pushd kythe-verification; stack install && ./test.sh; popd
-```
-
-To test all supported stack configurations, do `./run-ghc-tests.sh`.
-
-# Plugin
+## Haskell Indexer Plugin (ghc >= 8.6 only)
 
 Haskell modules can be indexed with a GHC source plugin while building a
 project. Whatever build system is in use, indexing can be achieved by
@@ -100,6 +85,21 @@ The following GHC options are relevant after the plugin is installed.
 * `-fplugin-opt Haskell.Indexer.Plugin:-o` and
   `-fplugin-opt Haskell.Indexer.Plugin:<output_path>`: Tell the plugin where
   to place the output of indexing.
+
+# Build the project
+
+Use the following to build and run tests:
+
+```
+git clone --recursive https://github.com/google/haskell-indexer.git
+cd haskell-indexer
+export STACK_YAML=$(readlink -f stack-ghc822.yaml)
+stack build && stack test
+# To test Kythe frontend:
+pushd kythe-verification; stack install && ./test.sh; popd
+```
+
+To test all supported stack configurations, do `./run-ghc-tests.sh`.
 
 # Demo
 
