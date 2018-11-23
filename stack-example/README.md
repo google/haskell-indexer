@@ -51,6 +51,12 @@ They can be skipped with
 $ INDEXER_PLUGIN_ENABLE=0 PATH=$(pwd)/ghc_wrapper:$PATH \
   STACK_ROOT=$HOME/.stack-indexer stack --system-ghc build <pkg>
 ```
+`INDEXER_PLUGIN_ENABLE=0` stops the `ghc` wrapper from using the
+plugin, but it stills tells GHC where to find it. The latter is
+necessary to workaround [a limitation in GHC][trac15940] when managing
+source plugins.
+
+[trac15940]: https://ghc.haskell.org/trac/ghc/ticket/15940
 
 To see the result of indexing, all produced files need to be collected
 into a serving table. This requires installing [kythe][kythe-install]
