@@ -38,7 +38,7 @@ $ export INDEXER_OUTPUT_DIR=/tmp/indexer-output
 $ PATH=$(pwd)/ghc_wrapper:$PATH \
   STACK_ROOT=$HOME/.stack-indexer stack --system-ghc build <pkg>
 ```
-We direct `stack` to use the `ghc` wrapper by incluiding it in the
+We direct `stack` to use the `ghc` wrapper by including it in the
 `PATH` and passing the flag `--system-ghc` to it.
 
 The purpose of using `STACK_ROOT` above, is to rebuild and index even 
