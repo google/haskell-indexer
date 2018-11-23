@@ -80,8 +80,26 @@ To test all supported stack configurations, do `./run-ghc-tests.sh`.
 
 # Plugin
 
-If you want to use the indexer GHC plugin with `stack`, see
+Haskell modules can be indexed with a GHC source plugin while building a
+project. Whatever build system is in use, indexing can be achieved by
+ensuring that the invocations to `ghc` include the flags that enable the
+plugin.
+
+For instruction on how to install and use the plugin with `stack`, see
 [stack-example/README.md](stack-example/README.md).
+
+The following GHC options are relevant after the plugin is installed.
+
+* `-package-db <db_path>`: Tells the package database where the plugin has
+  been installed. It may be used more than once if the plugin dependencies
+  spread through more than one package database.
+* `-plugin-package haskell-indexer-plugin`: Tells ghc to expose the package
+  containing the plugin, so it can be found when needed.
+* `-fplugin Haskell.Indexer.Plugin`: Tells to use the plugin when compiling
+  modules.
+* `-fplugin-opt Haskell.Indexer.Plugin:-o` and
+  `-fplugin-opt Haskell.Indexer.Plugin:<output_path>`: Tell the plugin where
+  to place the output of indexing.
 
 # Demo
 
