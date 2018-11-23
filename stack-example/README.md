@@ -3,8 +3,9 @@ and the [haskell-indexer-plugin][haskell-indexer-plugin].
 
 [haskell-indexer-plugin]: https://github.com/google/haskell-indexer
 
-First build the plugin.
+First change directory to `stack-example` and build the plugin.
 ```bash
+$ cd stack-example
 $ stack build haskell-indexer-plugin
 ```
 
@@ -24,7 +25,9 @@ EXAMPLE
 
     ./gen-ghc-wrapper.sh ghc_wrapper "$(stack path --compiler-exe)" \
     "$(stack path --snapshot-pkg-db)"
+```
 
+```bash
 $ ./gen-ghc-wrapper.sh ghc_wrapper "$(stack path --compiler-exe)" \
   "$(stack path --snapshot-pkg-db)"
 ```
