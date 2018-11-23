@@ -2,8 +2,8 @@ resolver: nightly-2018-10-15  # GHC 8.6.1
 name: haskell-indexer-snapshot
 
 packages:
-- git: https://github.com/mpickering/haskell-indexer
-  commit: 7622691f8fb9ebb020edf08679c41fcb7698f39d
+- git: https://github.com/google/haskell-indexer
+  commit: origin/master
   subdirs:
   - haskell-indexer-backend-core
   - haskell-indexer-backend-ghc
