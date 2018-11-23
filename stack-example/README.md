@@ -46,18 +46,18 @@ $ INDEXER_PLUGIN_ENABLE=0 PATH=$(pwd)/ghc_wrapper:$PATH \
   STACK_ROOT=$HOME/.stack-indexer stack --system-ghc build <pkg>
 ```
 
-To see the result of indexing all produced files need to be collected
+To see the result of indexing, all produced files need to be collected
 into a serving table. This requires installing [kythe][kythe-install]
 in advance.
 
-Then you can use [this script][server.sh] to start the web ui.
+Then you can use [serve.sh][serve.sh] to start the web ui.
 It picks the indexer output from the environment variable
 `INDEXER_OUTPUT_DIR`.
 ```bash
-$ serve.sh localhost:8080
+$ ../serve.sh localhost:8080
 ```
 
-[server.sh]: https://github.com/google/haskell-indexer/blob/master/serve.sh
+[serve.sh]: https://github.com/google/haskell-indexer/blob/master/serve.sh
 [kythe-install]: https://github.com/google/haskell-indexer#kythe
 
 
