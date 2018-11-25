@@ -40,17 +40,15 @@ cat > "$GHC_WRAPPER" <<EOF
 #!/bin/env bash
 if [ "\${INDEXER_PLUGIN_ENABLE:-}" != 0 ]
 then
-    PLUGIN="-fplugin Haskell.Indexer.Plugin"
+    PLUGIN="\
+-plugin-package haskell-indexer-plugin \
+-fplugin Haskell.Indexer.Plugin \
+-fplugin-opt Haskell.Indexer.Plugin:-o \
+-fplugin-opt Haskell.Indexer.Plugin:\${INDEXER_OUTPUT_DIR:-/tmp/indexer-output}"
 else
     PLUGIN=
 fi
-"$GHC_DIR/ghc" \
-\$@ \
--package-db "$PLUGIN_DB" \
--plugin-package haskell-indexer-plugin \
-\$PLUGIN \
--fplugin-opt Haskell.Indexer.Plugin:-o \
--fplugin-opt Haskell.Indexer.Plugin:\${INDEXER_OUTPUT_DIR:-/tmp/indexer-output}
+"$GHC_DIR/ghc" \$@ -package-db "$PLUGIN_DB" \$PLUGIN
 EOF
 chmod +x "$GHC_WRAPPER"
 ln -sf "$GHC_WRAPPER" "$OUTDIR/ghc"
