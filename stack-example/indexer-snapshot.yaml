@@ -1,0 +1,18 @@
+resolver: nightly-2018-10-15  # GHC 8.6.1
+name: haskell-indexer-snapshot
+
+packages:
+- git: https://github.com/google/haskell-indexer
+  commit: origin/master
+  subdirs:
+  - haskell-indexer-backend-core
+  - haskell-indexer-backend-ghc
+  - haskell-indexer-frontend-kythe
+  - haskell-indexer-pathutil
+  - haskell-indexer-pipeline-ghckythe
+  - haskell-indexer-pipeline-ghckythe-wrapper
+  - haskell-indexer-plugin
+  - haskell-indexer-translate
+  - kythe-proto
+  - kythe-schema
+  - text-offset

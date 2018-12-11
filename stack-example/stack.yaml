@@ -1,0 +1,3 @@
+resolver: indexer-snapshot.yaml
+packages:
+- location: http://hackage.haskell.org/package/tasty-1.1.0.4/tasty-1.1.0.4.tar.gz
