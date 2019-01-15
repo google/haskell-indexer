@@ -15,19 +15,9 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{- | Runs the indexer and emits serialized Kythe storage protos to stdout.
-The individual protos are prefixed by a varint-encoded binary length.
-
-Example: Indexing a module.
-
-    $ ghc_wrapper -c mycorpus -P gcc -- A.hs \
-          | /opt/kythe/tools/write_entries -graphstore /tmp/gs
-    $ /opt/kythe/tools/http_server \
-          -graphstore /tmp/gs \
-          -listen 0.0.0.0:8000 \
-          -public_resources /opt/kythe/web/ui
-
-Note: the arguments after the '--' are standard GHC arguments.
+{-
+This module provides the wrapper executable function (wrapperMain) but also
+exposes the flag parsing logic so it can be reused by the plugin.
 -}
 module Language.Haskell.Indexer.Args where
 
@@ -65,6 +55,8 @@ data Flags = Flags
     , flagPrependPathPrefix   :: !(Maybe Text)
     , flagKeepTempPathPrefix  :: !Bool
     , flagOverridePgmP        :: !(Maybe FilePath)
+    -- Path to a directory where to place the output files when running
+    -- the plugin.
     , flagOutput              :: !(Maybe FilePath)
     }
 
@@ -124,16 +116,17 @@ flagParser = Flags
      <*> optional (strOption
             ( long "output"
             <> short 'o'
-            <> metavar "PATH"
-            <> help ("The location to write the indexes to")))
+            <> metavar "INDEX_OUT_DIR"
+            <> help ("The directory to write the indices to")))
 
 index :: [String] -> Flags -> IO ()
 index args fs = do
     lock <- newMVar ()
     indexX (ghcToKythe lock) args fs
 
-indexX ::
-  (GhcArgs -> AnalysisOptions -> Raw.VName -> (Handle -> [Raw.Entry] -> IO ()) -> IO ())
+indexX
+  :: (GhcArgs -> AnalysisOptions -> Raw.VName
+        -> (Handle -> [Raw.Entry] -> IO ()) -> IO ())
   -> [String] -> Flags -> IO ()
 indexX k args Flags{..} = do
     let ghcArgs = defaultGhcArgs

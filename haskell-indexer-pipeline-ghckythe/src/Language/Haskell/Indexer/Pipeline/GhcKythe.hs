@@ -47,10 +47,15 @@ ghcToKythe
 ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
     withTypechecked globalLock ghcArgs analysisOptions (collect (sink stdout) baseVName)
 
-
+pluginContinuation :: (AnalysisOptions -> IO XRef)
+                   -> Handle
+                   -> a
+                   -> AnalysisOptions
+                   -> Raw.VName
+                   -> (Handle -> [Raw.Entry] -> IO r)
+                   -> IO ()
 pluginContinuation action h _ aoes baseVName sink
   = action aoes >>= collect (sink h) baseVName
-
 
 collect :: ([Raw.Entry] -> IO r) -> Raw.VName -> XRef -> IO ()
 collect sink baseVName xref = do

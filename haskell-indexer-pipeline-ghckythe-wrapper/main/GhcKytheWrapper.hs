@@ -28,7 +28,7 @@ Note: the arguments after the '--' are standard GHC arguments.
 -}
 module Main where
 
-import Language.Haskell.Indexer.Args
+import Language.Haskell.Indexer.Args (wrapperMain)
 
 main = wrapperMain
 
