@@ -17,6 +17,7 @@
 -- frontend.
 module Language.Haskell.Indexer.Pipeline.GhcKythe
     ( ghcToKythe
+    , pluginContinuation
     ) where
 
 import Control.Concurrent.MVar (MVar)
@@ -36,15 +37,28 @@ import Language.Haskell.Indexer.Frontend.Kythe (toKythe)
 
 import qualified Language.Kythe.Schema.Raw as Raw
 
+import System.IO
+
 ghcToKythe
     :: MVar () -> GhcArgs -> AnalysisOptions
     -> Raw.VName
-    -> ([Raw.Entry] -> IO ())
+    -> (Handle -> [Raw.Entry] -> IO ())
     -> IO ()
 ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
-    withTypechecked globalLock ghcArgs analysisOptions collect
-  where
-    collect xref = do
+    withTypechecked globalLock ghcArgs analysisOptions (collect (sink stdout) baseVName)
+
+pluginContinuation :: (AnalysisOptions -> IO XRef)
+                   -> Handle
+                   -> a
+                   -> AnalysisOptions
+                   -> Raw.VName
+                   -> (Handle -> [Raw.Entry] -> IO r)
+                   -> IO ()
+pluginContinuation action h _ aoes baseVName sink
+  = action aoes >>= collect (sink h) baseVName
+
+collect :: ([Raw.Entry] -> IO r) -> Raw.VName -> XRef -> IO ()
+collect sink baseVName xref = do
         sourceText <- lenientDecodeUtf8 . T.unpack
                     . unSourcePath . analysedTempPath . xrefFile
                     $ xref
@@ -56,8 +70,9 @@ ghcToKythe globalLock ghcArgs analysisOptions baseVName sink =
             =$= chunksOf 1000)
             $$ sinkChunks
     --
-    sinkChunks :: Sink [Raw.Entry] IO ()
-    sinkChunks = awaitForever (lift . sink)
+    where
+      sinkChunks :: Sink [Raw.Entry] IO ()
+      sinkChunks = awaitForever (lift . sink)
 
 -- | Haskell sources are de-facto UTF-8, but GHC ignores bad bytes in comments.
 -- See http://stackoverflow.com/questions/6797902/haskell-source-encoding.

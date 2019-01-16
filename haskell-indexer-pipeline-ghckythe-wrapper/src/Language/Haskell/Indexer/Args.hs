@@ -1,3 +1,4 @@
+
 -- Copyright 2017 Google Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,21 +15,11 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{- | Runs the indexer and emits serialized Kythe storage protos to stdout.
-The individual protos are prefixed by a varint-encoded binary length.
-
-Example: Indexing a module.
-
-    $ ghc_wrapper -c mycorpus -P gcc -- A.hs \
-          | /opt/kythe/tools/write_entries -graphstore /tmp/gs
-    $ /opt/kythe/tools/http_server \
-          -graphstore /tmp/gs \
-          -listen 0.0.0.0:8000 \
-          -public_resources /opt/kythe/web/ui
-
-Note: the arguments after the '--' are standard GHC arguments.
+{-
+This module provides the wrapper executable function (wrapperMain) but also
+exposes the flag parsing logic so it can be reused by the plugin.
 -}
-module Main where
+module Language.Haskell.Indexer.Args where
 
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Bool (bool)
@@ -50,8 +41,11 @@ import Language.Haskell.Indexer.Backend.AnalysisOptions (AnalysisOptions(..))
 import Language.Haskell.Indexer.Backend.GhcArgs
 import qualified Language.Kythe.Schema.Raw as Raw
 import qualified Language.Kythe.Schema.Raw.Proto as Raw
-import Language.Haskell.Indexer.Pipeline.GhcKythe (ghcToKythe)
+import Language.Haskell.Indexer.Pipeline.GhcKythe (ghcToKythe, pluginContinuation)
 import Language.Haskell.Indexer.Util.Path (asTextPath, stripTmpPrefix)
+import Language.Haskell.Indexer.Translate
+
+import GHC.IO.Handle
 
 -- | Command-line flags to control the indexer behavior.
 data Flags = Flags
@@ -61,10 +55,13 @@ data Flags = Flags
     , flagPrependPathPrefix   :: !(Maybe Text)
     , flagKeepTempPathPrefix  :: !Bool
     , flagOverridePgmP        :: !(Maybe FilePath)
+    -- Path to a directory where to place the output files when running
+    -- the plugin.
+    , flagOutput              :: !(Maybe FilePath)
     }
 
-main :: IO ()
-main = do
+wrapperMain :: IO ()
+wrapperMain = do
     (wrapperArgs, rest) <- break (== "--") <$> getArgs
     case rest of
         _:ghcArgs -> withArgs wrapperArgs (execParser opts) >>= index ghcArgs
@@ -75,6 +72,13 @@ main = do
                "ghc_wrapper - pretends to be GHC and writes Kythe artifacts. "
                ++ "Options after the first -- are passed on to GHC.")
         <> fullDesc
+
+kythePlugin :: Handle -> (AnalysisOptions -> IO XRef) -> Flags -> IO ()
+kythePlugin h action fs =
+  indexX (pluginContinuation action h)  [] fs
+
+wrapperParser :: [String] -> IO Flags
+wrapperParser opts = withArgs opts (execParser (info flagParser fullDesc))
 
 flagParser :: Parser Flags
 flagParser = Flags
@@ -109,10 +113,22 @@ flagParser = Flags
              <> help ("Overrides the preprocessor binary, but keeps it's "
                       ++ "options. Note: other tools can still be overriden "
                       ++ "by passing the regular -pgmX GHC options.")))
+     <*> optional (strOption
+            ( long "output"
+            <> short 'o'
+            <> metavar "INDEX_OUT_DIR"
+            <> help ("The directory to write the indices to")))
 
 index :: [String] -> Flags -> IO ()
-index args Flags{..} = do
+index args fs = do
     lock <- newMVar ()
+    indexX (ghcToKythe lock) args fs
+
+indexX
+  :: (GhcArgs -> AnalysisOptions -> Raw.VName
+        -> (Handle -> [Raw.Entry] -> IO ()) -> IO ())
+  -> [String] -> Flags -> IO ()
+indexX k args Flags{..} = do
     let ghcArgs = defaultGhcArgs
             { gaArgs = args
             , gaToolOverride = ToolOverride
@@ -133,13 +149,13 @@ index args Flags{..} = do
                 customPrepend p = fromMaybe p . fmap (<> p)
                                 $ flagPrependPathPrefix
         baseVName = Raw.VName "" flagCorpus "" "" "haskell"
-    ghcToKythe lock ghcArgs analysisOptions baseVName collect
+    k ghcArgs analysisOptions baseVName collect
   where
-    collect = mapM_ (\m -> do
+    collect handle = mapM_ (\m -> do
         let wire = encodeMessage . Raw.toEntryProto $ m
-        B.putStr . BL.toStrict . Builder.toLazyByteString
+        B.hPutStr handle . BL.toStrict . Builder.toLazyByteString
                  . varInt . B.length $ wire
-        B.putStr wire)
+        B.hPutStr handle wire)
 
 -- | From proto-lens.
 varInt :: Int -> Builder.Builder
