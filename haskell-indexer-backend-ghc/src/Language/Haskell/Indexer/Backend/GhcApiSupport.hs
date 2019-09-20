@@ -36,6 +36,8 @@ import GHC
 import qualified Linker
 import Outputable
 
+import DynamicLoading (initializePlugins)
+
 import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void, when)
@@ -187,8 +189,10 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         usedDflags <- getSessionDynFlags
         let env = GhcEnv (showSDoc usedDflags . ppr)
                          (showSDocForUser usedDflags neverQualify . ppr)
-        let extractXref = analyseTypechecked env analysisOpts
-        mapM (parseModule >=> typecheckModule >=> extractXref) (mgModSummaries graph)
+            extractXref = analyseTypechecked env analysisOpts
+            modsum = mgModSummaries graph
+        mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
+                (mgModSummaries graph)
     mapM_ xrefSink xrefGraph
  where
     errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut
@@ -235,3 +239,10 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- TODO(robinpalotai): link packages? See 'reallyInitDynLinker'.
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
+
+-- | Each module needs its plugins loaded explicitly.
+loadModulePlugins :: ModSummary -> Ghc ModSummary
+loadModulePlugins modsum = do
+    hsc_env <- getSession
+    dynflags' <- liftIO (initializePlugins hsc_env (ms_hspp_opts modsum))
+    return $ modsum { ms_hspp_opts = dynflags' }
