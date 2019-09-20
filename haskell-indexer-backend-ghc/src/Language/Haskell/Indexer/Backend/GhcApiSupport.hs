@@ -190,7 +190,6 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         let env = GhcEnv (showSDoc usedDflags . ppr)
                          (showSDocForUser usedDflags neverQualify . ppr)
             extractXref = analyseTypechecked env analysisOpts
-            modsum = mgModSummaries graph
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
     mapM_ xrefSink xrefGraph
