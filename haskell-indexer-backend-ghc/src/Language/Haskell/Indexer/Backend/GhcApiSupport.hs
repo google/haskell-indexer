@@ -36,7 +36,9 @@ import GHC
 import qualified Linker
 import Outputable
 
+#if __GLASGOW_HASKELL__ >= 861
 import DynamicLoading (initializePlugins)
+#endif
 
 import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
@@ -190,8 +192,12 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         let env = GhcEnv (showSDoc usedDflags . ppr)
                          (showSDocForUser usedDflags neverQualify . ppr)
             extractXref = analyseTypechecked env analysisOpts
+#if __GLASGOW_HASKELL__ >= 861
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
+#else
+        mapM (parseModule >=> typecheckModule >=> extractXref) (mgModSummaries graph)
+#endif
     mapM_ xrefSink xrefGraph
  where
     errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut
@@ -239,9 +245,11 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
 
+#if __GLASGOW_HASKELL__ >= 861
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary
 loadModulePlugins modsum = do
     hsc_env <- getSession
     dynflags' <- liftIO (initializePlugins hsc_env (ms_hspp_opts modsum))
     return $ modsum { ms_hspp_opts = dynflags' }
+#endif
