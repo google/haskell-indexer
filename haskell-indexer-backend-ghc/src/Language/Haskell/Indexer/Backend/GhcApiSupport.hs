@@ -37,7 +37,7 @@ import qualified Linker
 import Outputable
 import qualified Pretty
 
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
 import DynamicLoading (initializePlugins)
 #endif
 
@@ -77,7 +77,11 @@ showSDocForUserOneLine dflags unqual doc =
                        , Pretty.lineLength = pprCols dflags
                        }
    in Pretty.renderStyle s $
+#if __GLASGOW_HASKELL__ >= 802
         runSDoc doc (initSDocContext dflags (mkUserStyle dflags unqual AllTheWay))
+#else
+        runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay))
+#endif
 
 -- | Must be called serialized - due to some global linker state GHC API
 -- can't process multiple compilations concurrently (see
@@ -201,7 +205,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         let env = GhcEnv (showSDocOneLine usedDflags . ppr)
                          (showSDocForUserOneLine usedDflags neverQualify . ppr)
             extractXref = analyseTypechecked env analysisOpts
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
 #else
@@ -251,7 +255,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
 
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary
 loadModulePlugins modsum = do
