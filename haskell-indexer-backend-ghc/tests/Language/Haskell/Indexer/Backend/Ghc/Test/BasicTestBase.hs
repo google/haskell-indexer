@@ -25,6 +25,11 @@ import Test.Framework (Test)
 import Test.Framework.Providers.HUnit (testCase)
 import Test.HUnit (assertFailure)
 
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+
+import Control.Monad (forM_)
+
 type AssertionInEnv = ReaderT TestEnv IO ()
 
 -- | Tests that arguments of top-level functions, and their references, are
@@ -330,6 +335,22 @@ testImports = assertXRefsFrom ["basic/Imports.hs"] $ do
     importAt (3, 8) "Data.Int"
     importAt (4, 8) "Data.List"
 
+testImportRefs :: AssertionInEnv
+testImportRefs = assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefs.hs"]
+  $ do
+    -- foo
+    declAt (4,1) >>= usages >>= \case
+        [u1, u2] -> do
+            includesPos (3,1) u1  -- type signature in ImportDefs.hs
+            includesPos (3,20) u2 -- import statement in ImportRefs.hs
+        us -> checking $ assertFailure "Usage count differs for foo"
+    -- bar
+    declAt (7,1) >>= usages >>= \case
+        [u1, u2] -> do
+            includesPos (3,25) u1 -- import statement in ImportRefs.hs
+            includesPos (6,1) u2  -- type signature in ImportDefs.hs
+        us -> checking $ assertFailure "Usage count differs for bar"
+
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
 allTests env =
@@ -355,6 +376,7 @@ allTests env =
     , envTestCase "data-con-wrap" testDataConWrap
     , envTestCase "utf8" testUtf8
     , envTestCase "imports" testImports
+    , envTestCase "importRefs" testImportRefs
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

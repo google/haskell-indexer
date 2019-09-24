@@ -432,14 +432,16 @@ makeInstanceTick ctx splitType = Tick
 -- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
-refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
+refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
         sigRefs = case hs_valds hsGroup of
             ValBindsCompat lsigs -> concatMap refsFromSignature lsigs
+        importRefs = concatMap refsFromImportDecl importDecls
         refContext = Nothing
-    in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
+    in map (toTickReference ctx refContext declAlts)
+           (typeRefs ++ sigRefs ++ importRefs)
   where
     refsFromHsType :: LHsType GhcRn -> Maybe Reference
     refsFromHsType (L l ty) = case hsTypeVarName ty of
@@ -455,6 +457,19 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         TypeSigCompat names _ ->
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
         _ -> []
+
+    refsFromImportDecl :: LImportDecl GhcRn -> [Reference]
+    refsFromImportDecl (L _ idecl) = case idecl of
+      ImportDecl {..} ->
+        case ideclHiding of
+          Nothing -> []
+          Just (_, (L _ imports)) -> mapMaybe refsFromImport imports
+      _ -> []
+
+    refsFromImport :: LIE GhcRn -> Maybe Reference
+    refsFromImport (L _ (IEVar _ (L l n))) =
+        give ctx (nameLocToRef (ieWrappedName n) Ref l)
+    refsFromImport _ = Nothing
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
@@ -1088,15 +1103,19 @@ srcSpanToSpan = \case
 -- module is used in the generated Tick.
 nameInModuleToTick :: ExtractCtx -> Name -> Tick
 nameInModuleToTick ctx n = Tick
-    { tickSourcePath = ecSourcePath ctx
+    { tickSourcePath = sourcePath
     , tickPkgModule = extractModuleName ctx nModule
     , tickThing = nameOccurenceText n
-    , tickSpan = give ctx (srcSpanToSpan (nameSrcSpan n))
+    , tickSpan = nameSpan
     , tickUniqueInModule = isExternalName n
     , tickTermLevel = GHC.isValName n
     }
   where
+    nameSpan = give ctx (srcSpanToSpan (nameSrcSpan n))
     nModule = fromMaybe (ecModule ctx) (nameModule_maybe n)
+    sourcePath = case nameSpan of
+        Nothing -> ecSourcePath ctx
+        Just span -> spanFile span
 
 nameOccurenceText :: Name -> Text
 nameOccurenceText = T.pack . nameOccurenceString
