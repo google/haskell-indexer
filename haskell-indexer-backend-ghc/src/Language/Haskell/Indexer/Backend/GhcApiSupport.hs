@@ -35,21 +35,20 @@ import DynFlags
 import GHC
 import qualified Linker
 import Outputable
+import qualified Pretty
 
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
 import DynamicLoading (initializePlugins)
 #endif
 
 import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
-import Control.Monad ((>=>), forM_, unless, void, when)
+import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
-import qualified Data.IORef as I
 import qualified Data.List as L
 
 import GHC.Paths (libdir)
 import System.FilePath ((</>))
-import qualified System.Directory as Dir
 import System.Posix.Signals (installHandler, sigINT, Handler(Default))
 import System.IO (hPutStrLn, stderr)
 
@@ -69,6 +68,20 @@ isHaskellishTarget (src,_) =
 
 printErr :: MonadIO m => String -> m ()
 printErr = liftIO . hPutStrLn stderr
+
+-- This should probably be moved to GHC's Outputable module.
+-- Combined form of 'showSDocOneLine' and 'showSDocForUser'.
+showSDocForUserOneLine :: DynFlags -> PrintUnqualified -> SDoc -> String
+showSDocForUserOneLine dflags unqual doc =
+  let s = Pretty.style { Pretty.mode = Pretty.OneLineMode
+                       , Pretty.lineLength = pprCols dflags
+                       }
+   in Pretty.renderStyle s $
+#if __GLASGOW_HASKELL__ >= 802
+        runSDoc doc (initSDocContext dflags (mkUserStyle dflags unqual AllTheWay))
+#else
+        runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay))
+#endif
 
 -- | Must be called serialized - due to some global linker state GHC API
 -- can't process multiple compilations concurrently (see
@@ -189,10 +202,10 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         void $ GHC.load LoadAllTargets
         printErr "Loaded Haskell targets"
         usedDflags <- getSessionDynFlags
-        let env = GhcEnv (showSDoc usedDflags . ppr)
-                         (showSDocForUser usedDflags neverQualify . ppr)
+        let env = GhcEnv (showSDocOneLine usedDflags . ppr)
+                         (showSDocForUserOneLine usedDflags neverQualify . ppr)
             extractXref = analyseTypechecked env analysisOpts
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
 #else
@@ -217,9 +230,6 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         { hscTarget = HscNothing, ghcLink = NoLink }
     -- | Note: v=3 is the regular command-line "-v".
     verbose v dflags = dflags { verbosity = v }
-    --
-    alterSettings :: (Settings -> Settings) -> DynFlags -> DynFlags
-    alterSettings f dflags = dflags { settings = f (settings dflags) }
     -- | Tries to replicate loading logic found in 'reallyInitDynLinker', which
     -- is only called once per GHC(API) process, so not suitable for repeated
     -- calls.
@@ -245,7 +255,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
 
-#if __GLASGOW_HASKELL__ >= 861
+#if __GLASGOW_HASKELL__ >= 806
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary
 loadModulePlugins modsum = do
