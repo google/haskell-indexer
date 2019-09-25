@@ -9,6 +9,7 @@ module RecordReadRef where
 --   alternative span).
 -- - @foo defines/binding FieldFoo
 -- - @bar defines/binding FieldBar
+-- - @#1Rec defines/binding CtorR
 data Rec = Rec { foo :: Int, bar :: Int }
 
 -- No field references here, only to the introduced local binding (see
@@ -38,7 +39,7 @@ punned Rec{foo} =
 -- - @foo ref FieldFoo
 -- - @baz defines/binding VarBaz
 reassigned Rec{foo=baz} =
-    -- @baz ref VarBaz
+    -- - @baz ref VarBaz
     baz
 
 -- - @bar ref FieldBar

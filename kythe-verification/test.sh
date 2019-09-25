@@ -45,6 +45,7 @@ for fut in \
     "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
     "$BASIC/DataRef.hs" \
     "$BASIC/FunctionArgRef.hs" \
+    "$BASIC/ImportDefs.hs $BASIC/ImportRefs.hs" \
     "$BASIC/LocalRef.hs" \
     "$BASIC/Module.hs" \
     "$BASIC/RecordReadRef.hs" \
