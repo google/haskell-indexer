@@ -419,3 +419,8 @@ pattern IEVarCompat lwn <-
 #else
   IEVar _ lwn
 #endif
+
+-- 8.0.x doesn't have ieWrappedName.
+#if __GLASGOW_HASKELL__ < 802
+ieWrappedName = id
+#endif
