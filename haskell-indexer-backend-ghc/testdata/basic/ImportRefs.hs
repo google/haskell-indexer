@@ -1,3 +1,3 @@
 module ImportRefs where
 
-import ImportDefs (foo, bar)
+import ImportDefs (FooBar (..), bar, foo)

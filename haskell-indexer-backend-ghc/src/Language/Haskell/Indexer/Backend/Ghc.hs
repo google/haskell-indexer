@@ -463,13 +463,18 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
       ImportDecl {..} ->
         case ideclHiding of
           Nothing -> []
-          Just (_, (L _ imports)) -> mapMaybe refsFromImport imports
+          Just (False, (L _ imports)) ->
+              mapMaybe (refsFromImport Import) imports
+          Just (True, (L _ imports)) ->
+              mapMaybe (refsFromImport Ref) imports
       _ -> []
 
-    refsFromImport :: LIE GhcRn -> Maybe Reference
-    refsFromImport (L _ (IEVarCompat (L l n))) =
-        give ctx (nameLocToRef (ieWrappedName n) Ref l)
-    refsFromImport _ = Nothing
+    -- TODO(jinwoo): Support non-var imports (e.g., data constructors, dotted
+    -- imports, etc.)
+    refsFromImport :: ReferenceKind -> LIE GhcRn -> Maybe Reference
+    refsFromImport refKind (L _ (IEVarCompat (L l n))) =
+        give ctx (nameLocToRef (ieWrappedName n) refKind l)
+    refsFromImport _ _ = Nothing
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
@@ -1115,7 +1120,7 @@ nameInModuleToTick ctx n = Tick
     nModule = fromMaybe (ecModule ctx) (nameModule_maybe n)
     sourcePath = case nameSpan of
         Nothing -> ecSourcePath ctx
-        Just span -> spanFile span
+        Just s -> spanFile s
 
 nameOccurenceText :: Name -> Text
 nameOccurenceText = T.pack . nameOccurenceString

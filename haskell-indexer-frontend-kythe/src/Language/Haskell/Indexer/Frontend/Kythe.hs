@@ -129,6 +129,7 @@ makeUsageFacts TickReference{..} = do
             Ref -> RefE
             Call -> RefE
             TypeDecl -> RefDocE
+            Import -> RefImportsE
     makeAnchor (Just refSourceSpan) edgeType targetVname Nothing mbCallContext
 
 -- | Makes all entries for a declaration.
