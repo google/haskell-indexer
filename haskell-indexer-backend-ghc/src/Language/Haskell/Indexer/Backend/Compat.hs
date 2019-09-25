@@ -413,6 +413,9 @@ pattern ClsInstDeclCompat lty lbinds  <-
   ClsInstDecl _ lty lbinds _ _ _ _
 #endif
 
-
-
-
+pattern IEVarCompat lwn <-
+#if __GLASGOW_HASKELL__ < 806
+  IEVar lwn
+#else
+  IEVar _ lwn
+#endif

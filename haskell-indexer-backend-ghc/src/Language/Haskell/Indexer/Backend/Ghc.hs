@@ -467,7 +467,7 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
       _ -> []
 
     refsFromImport :: LIE GhcRn -> Maybe Reference
-    refsFromImport (L _ (IEVar _ (L l n))) =
+    refsFromImport (L _ (IEVarCompat (L l n))) =
         give ctx (nameLocToRef (ieWrappedName n) Ref l)
     refsFromImport _ = Nothing
 
