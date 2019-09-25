@@ -30,6 +30,7 @@ Analysed format (so various backends can be plugged).
 module Language.Haskell.Indexer.Backend.Ghc
     ( analyseTypechecked
     , analyseTypechecked'
+    , generateRefEdgeForHiddenImports
     , AnalysisOptions(..)
     ) where
 
@@ -428,6 +429,11 @@ makeInstanceTick ctx splitType = Tick
     , tickTermLevel = False
     }
 
+-- | Whether to generate a Ref edge from hidden imported entities to their
+-- definition sites.
+generateRefEdgeForHiddenImports :: Bool
+generateRefEdgeForHiddenImports = True
+
 -- | Collects type-level references. These visibly appear in type signatures,
 -- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
@@ -465,8 +471,10 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
           Nothing -> []
           Just (False, (L _ imports)) ->
               mapMaybe (refsFromImport Import) imports
-          Just (True, (L _ imports)) ->
-              mapMaybe (refsFromImport Ref) imports
+          Just (True, (L _ imports))
+              | generateRefEdgeForHiddenImports ->
+                  mapMaybe (refsFromImport Ref) imports
+              | otherwise -> []
       _ -> []
 
     -- TODO(jinwoo): Support non-var imports (e.g., data constructors, dotted
