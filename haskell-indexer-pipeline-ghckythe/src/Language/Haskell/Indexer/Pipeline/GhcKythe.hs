@@ -24,7 +24,16 @@ import Control.Concurrent.MVar (MVar)
 import Control.Monad.Identity (runIdentity)
 import Control.Monad.Morph (lift, hoist)
 import qualified Data.ByteString as B
-import Data.Conduit (($$), (=$=), await, awaitForever, yield, Conduit, Sink, transPipe)
+import Data.Conduit
+    ( (.|)
+    , ConduitT
+    , Void
+    , await
+    , awaitForever
+    , runConduit
+    , transPipe
+    , yield
+    )
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -65,13 +74,16 @@ collect sink baseVName xref = do
         -- Note: since this Conduit pipeline is pretty context-dependent, there
         -- is low chance of leak due to accidental sharing (see
         -- https://www.well-typed.com/blog/2016/09/sharing-conduit/).
-        transPipe (return . runIdentity) (toKythe baseVName sourceText xref
-            -- Batch an ad-hoc number of entries to be emitted together.
-            =$= chunksOf 1000)
-            $$ sinkChunks
+        runConduit
+          $ transPipe (return . runIdentity)
+              ( toKythe baseVName sourceText xref
+                  -- Batch an ad-hoc number of entries to be emitted together.
+                  .| chunksOf 1000
+              )
+            .| sinkChunks
     --
     where
-      sinkChunks :: Sink [Raw.Entry] IO ()
+      sinkChunks :: ConduitT [Raw.Entry] Void IO ()
       sinkChunks = awaitForever (lift . sink)
 
 -- | Haskell sources are de-facto UTF-8, but GHC ignores bad bytes in comments.
@@ -90,7 +102,7 @@ lenientDecodeUtf8 = fmap (T.decodeUtf8With T.lenientDecode) . B.readFile
 -- fewer than n elements.
 --
 -- Note: present in upstream Conduit 1.2.9.
-chunksOf :: Monad m => Int -> Conduit a m [a]
+chunksOf :: Monad m => Int -> ConduitT a [a] m ()
 chunksOf n = start
   where
     start = await >>= maybe (return ()) (\x -> loop n (x:))

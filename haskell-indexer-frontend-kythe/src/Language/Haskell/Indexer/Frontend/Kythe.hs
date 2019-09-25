@@ -26,7 +26,7 @@ import Control.Monad.Morph (lift, hoist)
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString as BS
-import Data.Conduit (ConduitM, Source)
+import Data.Conduit (ConduitT)
 import Data.Conduit.List (sourceList)
 import Data.Maybe (fromMaybe, maybeToList)
 import Data.Monoid ((<>))
@@ -58,7 +58,7 @@ type ConversionT = ReaderT ConversionEnv
 
 -- | Converts crossreference data of a file to Kythe schema.
 -- 'basevn' should have the corpus and language prefilled.
-toKythe :: Raw.VName -> T.Text -> XRef -> Source Identity Raw.Entry
+toKythe :: Raw.VName -> T.Text -> XRef -> ConduitT () Raw.Entry Identity ()
 toKythe basevn content XRef{..} = do
     let NameAndEntries pkgvn pkgEntries =
             makePackageFacts basevn (mtPkgModule xrefModule)
@@ -85,7 +85,7 @@ toKythe basevn content XRef{..} = do
 -- those entries. To be applied at reasonable points in the computation tree,
 -- where already a decent but not too large amount of entries have accumulated
 stream :: Conversion [Raw.Entry]
-       -> ConversionT (ConduitM () Raw.Entry Identity) ()
+       -> ConversionT (ConduitT () Raw.Entry Identity) ()
 stream a = do
     es <- hoist lift a
     lift (sourceList es)

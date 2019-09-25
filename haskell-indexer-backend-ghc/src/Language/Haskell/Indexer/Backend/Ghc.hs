@@ -109,17 +109,17 @@ analyseTypechecked ghcEnv opts tm =
       moduleSpan =
         fmap getLoc . hsmodName . unLoc . pm_parsed_source
           $ tm_parsed_module tm
-      moduleInfo = (ms_mod modSummary, moduleSpan)
-  in analyseTypechecked' ghcEnv opts modSummary renSource tcSource moduleInfo
+      modInfo = (ms_mod modSummary, moduleSpan)
+  in analyseTypechecked' ghcEnv opts modSummary renSource tcSource modInfo
 
 analyseTypechecked'
   :: GhcMonad m => GhcEnv -> AnalysisOptions
   -> ModSummary -> Maybe RenamedSource -> LHsBinds GhcTc
   -> (Module, Maybe SrcSpan)
   -> m XRef
-analyseTypechecked' ghcEnv opts modSummary renSource tcSource (mod, mspan) = do
+analyseTypechecked' ghcEnv opts modSummary renSource tcSource (mod', mspan) = do
   let ctx = ExtractCtx (ms_mod modSummary) strippedModFile ghcEnv opts
-      moduleTick = give ctx $ mkModuleTick mspan mod
+      moduleTick = give ctx $ mkModuleTick mspan mod'
       -- Analysed modules always arrive as file references in practice.
       modFile = T.pack $!
                     fromMaybe "?" (ml_hs_file . ms_location $ modSummary)
@@ -151,7 +151,7 @@ analyseTypechecked' ghcEnv opts modSummary renSource tcSource (mod, mspan) = do
 -- element, but we want to redirect that reference to our main tick in Decl.
 data DeclAndAlt = DeclAndAlt
     { daDecl :: !Decl
-    , daAlt :: !(Maybe Tick)
+    , _daAlt :: !(Maybe Tick)
       -- ^ Alternative reference, recursive functions can be referred using
       --   this - see https://ghc.haskell.org/trac/ghc/ticket/11176.
       --   There are other use cases too - see usages.
@@ -195,10 +195,10 @@ modifyDecl declMods decl =
 
 -- | Bundles up the module name with its source span.
 mkModuleTick :: (Given ExtractCtx) => Maybe SrcSpan -> Module -> ModuleTick
-mkModuleTick span mod = ModuleTick pkgmodule moduleNameSpan
+mkModuleTick span' mod' = ModuleTick pkgmodule moduleNameSpan
   where
-    moduleNameSpan = srcSpanToSpan =<< span
-    pkgmodule = extractModuleName given mod
+    moduleNameSpan = srcSpanToSpan =<< span'
+    pkgmodule = extractModuleName given mod'
 
 
 -- | Extracts:
@@ -248,10 +248,6 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     --
     namesFromForall :: HsType GhcRn -> [Name]
     namesFromForall (HsForAllTyCompat binders) = map hsLTyVarName binders
-      where
-        mkDecl :: LHsTyVarBndr GhcRn -> DeclAndAlt
-        mkDecl binder =
-          nameDeclAlt ctx (hsLTyVarName binder) Nothing typeStringyType
     namesFromForall _ = []
 #else
     -- Getting the location of implicit variable bindings is tricky, as the
@@ -318,7 +314,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     hsTyVarBinderName :: HsTyVarBndr id -> IdP id
     hsTyVarBinderName = \case
         UserTyVarCompat n -> mayUnLoc n
-        KindedTyVarCompat n -> unLoc n
+        KindedTyVarCompat n -> mayUnLoc n
     -- Datatypes.
     dataDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
     dataDecls (L _ (DataDeclCompat locName binders defn)) =
@@ -522,12 +518,12 @@ importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
   where
     mkImport :: GhcMonad m => LImportDecl GhcRn -> m ModuleTick
     mkImport (L _ implDecl) = do
-      pkgModule <- (extractPkgModule ctx) . unLoc . ideclName $ implDecl
+      pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
       let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
       return $ ModuleTick pkgModule pkgSpan
 
-    extractPkgModule :: GhcMonad m => ExtractCtx -> ModuleName -> m PkgModule
-    extractPkgModule ctx name = findModule name Nothing >>= return . extractModuleName ctx
+    extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
+    extractPkgModule name = findModule name Nothing >>= return . extractModuleName ctx
 
 
 -- | Fabricates an instance method tick based on RenamedSource data. The
@@ -611,8 +607,8 @@ deepDeclsFromTopBind ctx top =
         varDeclNoAlt v = varDeclAlt ctx v Nothing
 
 data ParentChild a = ParentChild
-  { pcParent :: !(Maybe a)
-  , pcChild :: !a
+  { _pcParent :: !(Maybe a)
+  , _pcChild :: !a
   }
 
 -- | Like 'universe', but serves the elements along with their nearest ancestor
@@ -620,8 +616,8 @@ data ParentChild a = ParentChild
 universeWithParents :: (Data a, Typeable a) => a -> [ParentChild a]
 universeWithParents a = ParentChild Nothing a : go a
   where
-    go a = let cs = children a
-           in map (ParentChild (Just $! a)) cs ++ concatMap go cs
+    go x = let cs = children x
+           in map (ParentChild (Just $! x)) cs ++ concatMap go cs
 
 
 -- | Function declarations from the bindings.
@@ -805,8 +801,9 @@ pullInstanceAbsBindsToTop = (fromMaybe . return) <*> instanceAbsBinds
 
 -- | Returns (non-instance binds, instance-binds).
 partitionInstanceAbsBinds
-    :: [LHsBindLR GhcTc GhcTc] -> ([LHsBindLR GhcTc GhcTc], [LHsBindLR GhcTc GhcTc])
-    = both concat . partitionEithers . map instToRight
+    :: [LHsBindLR GhcTc GhcTc]
+    -> ([LHsBindLR GhcTc GhcTc], [LHsBindLR GhcTc GhcTc])
+partitionInstanceAbsBinds = both concat . partitionEithers . map instToRight
   where
     instToRight b = maybe (Left [b]) Right . instanceAbsBinds $ b
 
