@@ -25,11 +25,6 @@ import Test.Framework (Test)
 import Test.Framework.Providers.HUnit (testCase)
 import Test.HUnit (assertFailure)
 
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
-
-import Control.Monad (forM_)
-
 type AssertionInEnv = ReaderT TestEnv IO ()
 
 -- | Tests that arguments of top-level functions, and their references, are
