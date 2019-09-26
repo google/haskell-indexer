@@ -89,7 +89,7 @@ showSDocForUserOneLine dflags unqual doc =
 withTypechecked
     :: MVar () -> GhcArgs -> AnalysisOptions -> (XRef -> IO ()) -> IO ()
 withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
-        = withMVar globalLock . const . errHandling $ do
+        = withMVar globalLock . const $ do
     -- TODO(robinpalotai): logging
     printErr "Running GHC"
     xrefGraph <- runGhc (Just $ gaLibdirPrefix </> libdir) $ do
@@ -213,7 +213,6 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
 #endif
     mapM_ xrefSink xrefGraph
  where
-    errHandling = defaultErrorHandler defaultFatalMessager defaultFlushOut
     -- | RTS args would tune performance of the compilation. But we can't set
     -- them per-compilation from 'GhcApiSupport', so drop them.
     partitionRtsArgs :: [String] -> ([String], [String])
