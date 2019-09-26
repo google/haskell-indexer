@@ -22,7 +22,7 @@ f (B x) =
     -- - @x ref PatternX
     x
 
--- @Record defines/binding TypeR
+-- - @Record defines/binding TypeR
 data Record =
     -- TODO(robinpalotai): - CtorR childof TypeR
     -- TODO(robinpalotai): - FieldR childof CtorR

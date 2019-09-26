@@ -16,7 +16,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Haskell.Indexer.Backend.Ghc.Test.BasicTestBase (allTests) where
 
-import Control.Monad ((>=>), void)
+import Control.Monad ((>=>), unless, void)
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 
 import Language.Haskell.Indexer.Backend.Ghc.Test.TestHelper
@@ -330,6 +330,43 @@ testImports = assertXRefsFrom ["basic/Imports.hs"] $ do
     importAt (3, 8) "Data.Int"
     importAt (4, 8) "Data.List"
 
+assertRefKind :: ReferenceKind -> TickReference -> ReaderT XRef IO ()
+assertRefKind expected tick =
+  let actual = refKind tick
+   in unless (actual == expected)
+        $ checking
+        $ assertFailure
+        $ show expected ++ " expected; got " ++ show actual
+
+testImportRefs :: AssertionInEnv
+testImportRefs = assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefs.hs"]
+  $ do
+    -- foo
+    declAt (9, 1) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (3, 38) u1 -- import statement in ImportRefs.hs
+        assertRefKind Import u1
+        includesPos (8, 1) u2 -- type signature in ImportDefs.hs
+      us -> checking $ assertFailure "Usage count differs for foo"
+    -- bar
+    declAt (12, 1) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (3, 33) u1 -- import statement in ImportRefs.hs
+        assertRefKind Import u1
+        includesPos (11, 1) u2 -- type signature in ImportDefs.hs
+      us -> checking $ assertFailure "Usage count differs for bar"
+
+testImportRefsHiding :: AssertionInEnv
+testImportRefsHiding =
+  assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefsHiding.hs"]
+    $ do
+      declAt (12, 1) >>= usages >>= \case
+        [u1, u2] -> do
+          includesPos (3, 27) u1 -- import statement in ImportRefsHiding.hs
+          assertRefKind Ref u1
+          includesPos (11, 1) u2 -- type signature in ImportDefs.hs
+        us -> checking $ assertFailure "Usage count differs for bar"
+
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
 allTests env =
@@ -355,6 +392,8 @@ allTests env =
     , envTestCase "data-con-wrap" testDataConWrap
     , envTestCase "utf8" testUtf8
     , envTestCase "imports" testImports
+    , envTestCase "import-refs" testImportRefs
+    , envTestCase "import-refs-hiding" testImportRefsHiding
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

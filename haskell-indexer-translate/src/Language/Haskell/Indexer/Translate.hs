@@ -223,6 +223,7 @@ data ReferenceKind
     = Ref      -- ^ Reference
     | Call     -- ^ Function call
     | TypeDecl -- ^ Usage of identifier in type declaration, left to "::"
+    | Import   -- ^ Imported entities
     deriving (Eq, Ord, Show)
 
 -- | A Relation is between standalone semantic nodes, in contrast to

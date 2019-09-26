@@ -413,6 +413,14 @@ pattern ClsInstDeclCompat lty lbinds  <-
   ClsInstDecl _ lty lbinds _ _ _ _
 #endif
 
+pattern IEVarCompat lwn <-
+#if __GLASGOW_HASKELL__ < 806
+  IEVar lwn
+#else
+  IEVar _ lwn
+#endif
 
-
-
+-- 8.0.x doesn't have ieWrappedName.
+#if __GLASGOW_HASKELL__ < 802
+ieWrappedName = id
+#endif

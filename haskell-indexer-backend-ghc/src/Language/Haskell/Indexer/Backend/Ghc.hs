@@ -30,6 +30,7 @@ Analysed format (so various backends can be plugged).
 module Language.Haskell.Indexer.Backend.Ghc
     ( analyseTypechecked
     , analyseTypechecked'
+    , generateRefEdgeForHiddenImports
     , AnalysisOptions(..)
     ) where
 
@@ -428,18 +429,25 @@ makeInstanceTick ctx splitType = Tick
     , tickTermLevel = False
     }
 
+-- | Whether to generate a Ref edge from hidden imported entities to their
+-- definition sites.
+generateRefEdgeForHiddenImports :: Bool
+generateRefEdgeForHiddenImports = True
+
 -- | Collects type-level references. These visibly appear in type signatures,
 -- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
-refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
+refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
         sigRefs = case hs_valds hsGroup of
             ValBindsCompat lsigs -> concatMap refsFromSignature lsigs
+        importRefs = concatMap refsFromImportDecl importDecls
         refContext = Nothing
-    in map (toTickReference ctx refContext declAlts) (typeRefs ++ sigRefs)
+    in map (toTickReference ctx refContext declAlts)
+           (typeRefs ++ sigRefs ++ importRefs)
   where
     refsFromHsType :: LHsType GhcRn -> Maybe Reference
     refsFromHsType (L l ty) = case hsTypeVarName ty of
@@ -455,6 +463,26 @@ refsFromRenamed ctx declAlts (hsGroup, _, _, _) =
         TypeSigCompat names _ ->
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
         _ -> []
+
+    refsFromImportDecl :: LImportDecl GhcRn -> [Reference]
+    refsFromImportDecl (L _ idecl) = case idecl of
+      ImportDecl {..} ->
+        case ideclHiding of
+          Nothing -> []
+          Just (False, (L _ imports)) ->
+              mapMaybe (refsFromImport Import) imports
+          Just (True, (L _ imports))
+              | generateRefEdgeForHiddenImports ->
+                  mapMaybe (refsFromImport Ref) imports
+              | otherwise -> []
+      _ -> []
+
+    -- TODO(jinwoo): Support non-var imports (e.g., data constructors, dotted
+    -- imports, etc.)
+    refsFromImport :: ReferenceKind -> LIE GhcRn -> Maybe Reference
+    refsFromImport refKind (L _ (IEVarCompat (L l n))) =
+        give ctx (nameLocToRef (ieWrappedName n) refKind l)
+    refsFromImport _ _ = Nothing
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
@@ -1088,15 +1116,19 @@ srcSpanToSpan = \case
 -- module is used in the generated Tick.
 nameInModuleToTick :: ExtractCtx -> Name -> Tick
 nameInModuleToTick ctx n = Tick
-    { tickSourcePath = ecSourcePath ctx
+    { tickSourcePath = sourcePath
     , tickPkgModule = extractModuleName ctx nModule
     , tickThing = nameOccurenceText n
-    , tickSpan = give ctx (srcSpanToSpan (nameSrcSpan n))
+    , tickSpan = nameSpan
     , tickUniqueInModule = isExternalName n
     , tickTermLevel = GHC.isValName n
     }
   where
+    nameSpan = give ctx (srcSpanToSpan (nameSrcSpan n))
     nModule = fromMaybe (ecModule ctx) (nameModule_maybe n)
+    sourcePath = case nameSpan of
+        Nothing -> ecSourcePath ctx
+        Just s -> spanFile s
 
 nameOccurenceText :: Name -> Text
 nameOccurenceText = T.pack . nameOccurenceString
