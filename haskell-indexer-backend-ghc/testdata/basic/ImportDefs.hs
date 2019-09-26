@@ -12,7 +12,7 @@ bar :: Double
 bar = 42.0
 
 data FooBar
-  = FooBar
+  = MkFooBar
       { fbFoo :: Int,
         fbBar :: Double
       }

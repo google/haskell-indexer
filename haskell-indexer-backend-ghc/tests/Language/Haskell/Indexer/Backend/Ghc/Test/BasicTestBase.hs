@@ -344,17 +344,30 @@ testImportRefs = assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefs.hs"]
     -- foo
     declAt (9, 1) >>= usages >>= \case
       [u1, u2] -> do
-        includesPos (3, 38) u1 -- import statement in ImportRefs.hs
+        includesPos (3, 25) u1 -- import statement in ImportRefs.hs
         assertRefKind Import u1
         includesPos (8, 1) u2 -- type signature in ImportDefs.hs
       us -> checking $ assertFailure "Usage count differs for foo"
     -- bar
     declAt (12, 1) >>= usages >>= \case
       [u1, u2] -> do
-        includesPos (3, 33) u1 -- import statement in ImportRefs.hs
+        includesPos (3, 20) u1 -- import statement in ImportRefs.hs
         assertRefKind Import u1
         includesPos (11, 1) u2 -- type signature in ImportDefs.hs
       us -> checking $ assertFailure "Usage count differs for bar"
+    -- FooBar
+    declAt (14, 6) >>= usages >>= \case
+      [u1, u2, u3] -> do
+        includesPos (4, 20) u1
+        includesPos (5, 20) u2
+        includesPos (6, 20) u3
+      us -> checking $ assertFailure "Usage count differs for FooBar"
+    -- MkFooBar
+    declAt (15, 5) >>= singleUsage >>= includesPos (6, 28)
+    -- fbFoo
+    declAt (16, 9) >>= singleUsage >>= includesPos (6, 38)
+    -- fbBar
+    declAt (17, 9) >>= singleUsage >>= includesPos (6, 45)
 
 testImportRefsHiding :: AssertionInEnv
 testImportRefsHiding =
