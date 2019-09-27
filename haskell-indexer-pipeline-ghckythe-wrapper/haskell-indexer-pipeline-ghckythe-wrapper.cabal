@@ -17,6 +17,7 @@ library
   hs-source-dirs:    src
   build-depends:       base >=4.8 && <5
                      , bytestring
+                     , ghc
                      , haskell-indexer-backend-core >= 0.1
                      , haskell-indexer-backend-ghc >= 0.1
                      , haskell-indexer-pathutil >= 0.1

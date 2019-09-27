@@ -45,6 +45,8 @@ import Language.Haskell.Indexer.Pipeline.GhcKythe (ghcToKythe, pluginContinuatio
 import Language.Haskell.Indexer.Util.Path (asTextPath, stripTmpPrefix)
 import Language.Haskell.Indexer.Translate
 
+import DynFlags (defaultFatalMessager, defaultFlushOut)
+import GHC (defaultErrorHandler)
 import GHC.IO.Handle
 
 -- | Command-line flags to control the indexer behavior.
@@ -122,7 +124,10 @@ flagParser = Flags
 index :: [String] -> Flags -> IO ()
 index args fs = do
     lock <- newMVar ()
-    indexX (ghcToKythe lock) args fs
+    withErrorHandler $ indexX (ghcToKythe lock) args fs
+  where
+    withErrorHandler :: IO a -> IO a
+    withErrorHandler = defaultErrorHandler defaultFatalMessager defaultFlushOut
 
 indexX
   :: (GhcArgs -> AnalysisOptions -> Raw.VName
