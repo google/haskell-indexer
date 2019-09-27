@@ -20,6 +20,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- Maintaining cross-version-compatible signatures is hard for the
+-- compatibility layer.
+{-# OPTIONS_GHC -fno-warn-missing-pattern-synonym-signatures #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+
 -- | Module trying to expose a unified (or at least simplified) view of the GHC
 -- AST changes across multiple compiler versions.
 module Language.Haskell.Indexer.Backend.Compat where
@@ -30,13 +35,18 @@ import Control.Arrow ((&&&))
 import HsExtension
 #endif
 
-import CmdLineParser
+#if __GLASGOW_HASKELL__ >= 804
+import CmdLineParser (Warn, warnMsg)
+#endif
 
 #if __GLASGOW_HASKELL__ >= 800
 import Module (UnitId, unitIdString)
-import qualified Bag
 #else
 import Module (Module, packageKeyString, modulePackageKey)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 800 && __GLASGOW_HASKELL__ < 804
+import qualified Bag
 #endif
 
 #if __GLASGOW_HASKELL__ < 802
@@ -45,7 +55,7 @@ import HsDecls (hs_instds)
 
 #if __GLASGOW_HASKELL__ < 800
 import GHC (PackageKey)
-import SrcLoc (combineSrcSpans)
+import SrcLoc (combineSrcSpans, getLoc)
 #endif
 
 import HsBinds (HsBindLR(..), Sig(..), LHsBinds, abe_mono, abe_poly)
@@ -55,12 +65,13 @@ import qualified HsTypes
 import HsTypes (HsType(HsTyVar), LHsType)
 import Id (Id)
 import Name (Name)
-import RdrName (RdrName)
 import Outputable (Outputable)
-import SrcLoc (Located, GenLocated(L), unLoc, getLoc)
+import SrcLoc (Located, GenLocated(L), unLoc)
 import GHC
 
 #if __GLASGOW_HASKELL__ < 804
+import RdrName (RdrName)
+
 type GhcPs = RdrName
 type GhcRn = Name
 type GhcTc = Id
@@ -196,6 +207,7 @@ pattern ClassDeclCompat locName binders sigs <-
 #if __GLASGOW_HASKELL__ >= 806
 conDeclNames (ConDeclH98 { con_name = conName })  = [conName]
 conDeclNames (ConDeclGADT { con_names = conNames }) = conNames
+conDeclNames (XConDecl _) = error "unexpected XConDecl"
 #elif __GLASGOW_HASKELL__ >= 800
 conDeclNames (ConDeclH98 conName _ _ _ _) = [conName]
 conDeclNames (ConDeclGADT conNames _ _) = conNames
@@ -213,11 +225,11 @@ maybeAbsBinds :: HsBindLR a b
 maybeAbsBinds :: HsBindLR a b
               -> Maybe (LHsBinds a, [(a, Maybe a)], AbsBindsKind)
 #endif
-maybeAbsBinds abs@(AbsBinds { abs_exports = exports,  abs_binds = binds}) =
+maybeAbsBinds absBinds@(AbsBinds { abs_exports = exports,  abs_binds = binds}) =
     let ids = map (abe_poly &&& (Just . abe_mono)) exports
         binds_type =
 #if __GLASGOW_HASKELL__ >= 804
-          if abs_sig abs then SigAbs else NormalAbs
+          if abs_sig absBinds then SigAbs else NormalAbs
 #else
           NormalAbs
 #endif
@@ -303,14 +315,17 @@ mgModSummaries = id
 valBinds valds =
   case valds of
     ValBindsOut _ lsigs -> lsigs
-    ValBindsIn _ lsigs ->
+    ValBindsIn _ _lsigs ->
       error "should not hit ValBindsIn when accessing renamed AST"
-
-
-pattern ValBindsCompat  lsigs <- (valBinds -> lsigs)
 #else
-pattern ValBindsCompat lsigs <- XValBindsLR (NValBinds _ lsigs)
+valBinds valds =
+  case valds of
+    ValBinds _ _ _ ->
+      error "should not hit ValBinds when accessing renamed AST"
+    XValBindsLR (NValBinds _ lsigs) -> lsigs
 #endif
+{-# COMPLETE ValBindsCompat #-}
+pattern ValBindsCompat lsigs <- (valBinds -> lsigs)
 
 #if __GLASGOW_HASKELL__ < 806
 pattern HsForAllTyCompat binders <- HsForAllTy binders _
@@ -319,12 +334,19 @@ pattern HsForAllTyCompat binders <- HsForAllTy _ binders _
 #endif
 
 #if __GLASGOW_HASKELL__ < 806
-pattern UserTyVarCompat n <- UserTyVar n
-pattern KindedTyVarCompat n <- KindedTyVar n _
+tyVarBndr var =
+  case var of
+    UserTyVar n -> n
+    KindedTyVar n _ -> n
 #else
-pattern UserTyVarCompat n <- UserTyVar _ n
-pattern KindedTyVarCompat n <- KindedTyVar _ n _
+tyVarBndr var =
+  case var of
+    UserTyVar _ n -> n
+    KindedTyVar _ n _ -> n
+    XTyVarBndr _ -> error "should not hit XTyVarBndr when accessing renamed AST"
 #endif
+{-# COMPLETE HsTyVarBndrCompat #-}
+pattern HsTyVarBndrCompat n <- (tyVarBndr -> n)
 
 pattern HsVarCompat v <-
 #if __GLASGOW_HASKELL__ < 806
