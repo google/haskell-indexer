@@ -313,8 +313,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
     hsTyVarBinderName :: HsTyVarBndr id -> IdP id
     hsTyVarBinderName = \case
-        UserTyVarCompat n -> mayUnLoc n
-        KindedTyVarCompat n -> mayUnLoc n
+        HsTyVarBndrCompat n -> mayUnLoc n
     -- Datatypes.
     dataDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
     dataDecls (L _ (DataDeclCompat locName binders defn)) =

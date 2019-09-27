@@ -311,18 +311,21 @@ needsTemplateHaskellOrQQ = needsTemplateHaskell
 mgModSummaries = id
 #endif
 
-{-# COMPLETE ValBindsCompat #-}
 #if __GLASGOW_HASKELL__ < 806
 valBinds valds =
   case valds of
     ValBindsOut _ lsigs -> lsigs
     ValBindsIn _ _lsigs ->
       error "should not hit ValBindsIn when accessing renamed AST"
-
-pattern ValBindsCompat lsigs <- (valBinds -> lsigs)
 #else
-pattern ValBindsCompat lsigs <- XValBindsLR (NValBinds _ lsigs)
+valBinds valds =
+  case valds of
+    ValBinds _ _ _ ->
+      error "should not hit ValBinds when accessing renamed AST"
+    XValBindsLR (NValBinds _ lsigs) -> lsigs
 #endif
+{-# COMPLETE ValBindsCompat #-}
+pattern ValBindsCompat lsigs <- (valBinds -> lsigs)
 
 #if __GLASGOW_HASKELL__ < 806
 pattern HsForAllTyCompat binders <- HsForAllTy binders _
@@ -330,14 +333,20 @@ pattern HsForAllTyCompat binders <- HsForAllTy binders _
 pattern HsForAllTyCompat binders <- HsForAllTy _ binders _
 #endif
 
-{-# COMPLETE UserTyVarCompat, KindedTyVarCompat #-}
 #if __GLASGOW_HASKELL__ < 806
-pattern UserTyVarCompat n <- UserTyVar n
-pattern KindedTyVarCompat n <- KindedTyVar n _
+tyVarBndr var =
+  case var of
+    UserTyVar n -> n
+    KindedTyVar n _ -> n
 #else
-pattern UserTyVarCompat n <- UserTyVar _ n
-pattern KindedTyVarCompat n <- KindedTyVar _ n _
+tyVarBndr var =
+  case var of
+    UserTyVar _ n -> n
+    KindedTyVar _ n _ -> n
+    XTyVarBndr _ -> error "should not hit XTyVarBndr when accessing renamed AST"
 #endif
+{-# COMPLETE HsTyVarBndrCompat #-}
+pattern HsTyVarBndrCompat n <- (tyVarBndr -> n)
 
 pattern HsVarCompat v <-
 #if __GLASGOW_HASKELL__ < 806
