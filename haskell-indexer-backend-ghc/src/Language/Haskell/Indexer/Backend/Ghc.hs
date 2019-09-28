@@ -44,6 +44,7 @@ import qualified ConLike
 import qualified DataCon as GHC
 import qualified Name as GHC
 import FastString (unpackFS)
+import FieldLabel (FieldLbl (..))
 import GHC
 import qualified Id as GHC
 import Name (nameModule_maybe, nameOccName)
@@ -465,19 +466,38 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
         case ideclHiding of
           Nothing -> []
           Just (False, (L _ imports)) ->
-              mapMaybe (refsFromImport Import) imports
+            concatMap (refsFromImport Import) imports
           Just (True, (L _ imports))
-              | generateRefEdgeForHiddenImports ->
-                  mapMaybe (refsFromImport Ref) imports
-              | otherwise -> []
+            | generateRefEdgeForHiddenImports ->
+              concatMap (refsFromImport Ref) imports
+            | otherwise -> []
       _ -> []
 
-    -- TODO(jinwoo): Support non-var imports (e.g., data constructors, dotted
-    -- imports, etc.)
-    refsFromImport :: ReferenceKind -> LIE GhcRn -> Maybe Reference
+    refsFromImport :: ReferenceKind -> LIE GhcRn -> [Reference]
     refsFromImport refKind (L _ (IEVarCompat (L l n))) =
-        give ctx (nameLocToRef (ieWrappedName n) refKind l)
-    refsFromImport _ _ = Nothing
+      maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
+    refsFromImport refKind (L _ (IEThingAbsCompat (L l n))) =
+      maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
+    refsFromImport refKind (L _ (IEThingAllCompat (L l n))) =
+      maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
+    refsFromImport refKind (L _ (IEThingWithCompat (L tl tn) ctors fields)) =
+      typeRef ++ ctorRefs ++ fieldRefs
+      where
+        typeRef =
+          maybeToList $ give ctx (nameLocToRef (ieWrappedName tn) refKind tl)
+        ctorRefs =
+          mapMaybe
+            ( \(L cl cn) ->
+                give ctx (nameLocToRef (ieWrappedName cn) refKind cl)
+            )
+            ctors
+        fieldRefs =
+          mapMaybe
+            ( \(L fl label) ->
+                give ctx (nameLocToRef (flSelector label) refKind fl)
+            )
+            fields
+    refsFromImport _ _ = []
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource

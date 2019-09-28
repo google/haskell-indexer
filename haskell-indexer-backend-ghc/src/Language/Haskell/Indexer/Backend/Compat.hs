@@ -442,6 +442,27 @@ pattern IEVarCompat lwn <-
   IEVar _ lwn
 #endif
 
+pattern IEThingAbsCompat lwn <-
+#if __GLASGOW_HASKELL__ < 806
+  IEThingAbs lwn
+#else
+  IEThingAbs _ lwn
+#endif
+
+pattern IEThingAllCompat lwn <-
+#if __GLASGOW_HASKELL__ < 806
+  IEThingAll lwn
+#else
+  IEThingAll _ lwn
+#endif
+
+pattern IEThingWithCompat lwn ctors fields <-
+#if __GLASGOW_HASKELL__ < 806
+  IEThingWith lwn _ ctors fields
+#else
+  IEThingWith _ lwn _ ctors fields
+#endif
+
 -- 8.0.x doesn't have ieWrappedName.
 #if __GLASGOW_HASKELL__ < 802
 ieWrappedName = id

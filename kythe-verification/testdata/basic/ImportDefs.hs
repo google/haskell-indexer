@@ -13,8 +13,7 @@ bar :: Double
 -- - @bar defines/binding BarVar
 bar = 42.0
 
-data FooBar
-  = FooBar
-      { fbFoo :: Int,
-        fbBar :: Double
-      }
+-- - @FooBar defines/binding TypeD
+-- - @MkFB defines/binding CtorD
+-- - @fbFoo defines/binding FieldFbFoo
+data FooBar = MkFB {fbFoo :: Int}
