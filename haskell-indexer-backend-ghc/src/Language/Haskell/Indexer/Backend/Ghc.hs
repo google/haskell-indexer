@@ -486,19 +486,17 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
         typeRef =
           maybeToList $ give ctx (nameLocToRef (ieWrappedName tn) refKind tl)
         ctorRefs =
-          catMaybes
-            $ map
-                ( \(L cl cn) ->
-                    give ctx (nameLocToRef (ieWrappedName cn) refKind cl)
-                )
-                ctors
+          mapMaybe
+            ( \(L cl cn) ->
+                give ctx (nameLocToRef (ieWrappedName cn) refKind cl)
+            )
+            ctors
         fieldRefs =
-          catMaybes
-            $ map
-                ( \(L fl label) ->
-                    give ctx (nameLocToRef (flSelector label) refKind fl)
-                )
-                fields
+          mapMaybe
+            ( \(L fl label) ->
+                give ctx (nameLocToRef (flSelector label) refKind fl)
+            )
+            fields
     refsFromImport _ _ = []
 
 -- | Exports subclasses/overrides relationships from typeclasses.
