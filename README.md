@@ -12,10 +12,8 @@ Indexing hosts:
    frontend likely not (see #38).
 
 Compilers:
-  - GHC 8.0.2
-  - GHC 8.2.2
-  - GHC 8.4.3
-  - GHC 8.6.1
+  - GHC 8.6.5
+  - GHC 8.8.1 (planned)
 
 Stackage:
   - A recent LTS release corresponding to above compilers is supported.
@@ -94,7 +92,7 @@ Use the following to build and run tests:
 ```
 git clone --recursive https://github.com/google/haskell-indexer.git
 cd haskell-indexer
-export STACK_YAML=$(readlink -f stack-ghc822.yaml)
+export STACK_YAML=$(readlink -f stack-ghc865.yaml)
 stack build && stack test
 # To test Kythe frontend:
 pushd kythe-verification; stack install && ./test.sh; popd

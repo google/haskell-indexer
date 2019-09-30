@@ -34,44 +34,20 @@ matrix:
   include:
   # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
   # https://github.com/hvr/multi-ghc-travis
-  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 8.0.2"
-    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
-
-  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=2.0 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 8.2.2"
-    addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
-
-  - env: BUILD=cabal GHCVER=8.4.3 CABALVER=2.2 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 8.4.3"
-    addons: {apt: {packages: [cabal-install-2.2,ghc-8.4.3,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
-
-  - env: BUILD=cabal GHCVER=8.6.1 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 8.6.1"
-    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.1,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.6.5"
+    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
-  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+  - env: BUILD=cabal GHCVER=head CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
     compiler: ": #GHC HEAD"
     addons: {apt: {packages: [cabal-install-head,ghc-head,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
   # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
   # variable, such as using --stack-yaml to point to a different file.
-  - env: STACK_YAML=stack-ghc802.yaml BUILD=stack
-    compiler: ": #stack-ghc802.yaml"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: STACK_YAML=stack-ghc822.yaml BUILD=stack
-    compiler: ": #stack-ghc822.yaml"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: STACK_YAML=stack-ghc843.yaml BUILD=stack
-    compiler: ": #stack-ghc843.yaml"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: STACK_YAML=stack-ghc861.yaml BUILD=stack
-    compiler: ": #stack-ghc861.yaml"
+  - env: STACK_YAML=stack-ghc865.yaml BUILD=stack
+    compiler: ": #stack-ghc865.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
   # Nightly builds are allowed to fail
@@ -82,12 +58,12 @@ matrix:
   # Build on macOS in addition to Linux
   # For now we keep only a single osx build for smoke test.
   # Can consider adding more later.
-  - env: STACK_YAML=stack-ghc802.yaml BUILD=stack
-    compiler: ": #stack-ghc802.yaml (osx)"
+  - env: STACK_YAML=stack-ghc865.yaml BUILD=stack
+    compiler: ": #stack-ghc865.yaml (osx)"
     os: osx
 
   allow_failures:
-  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+  - env: BUILD=cabal GHCVER=head CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
   - env: BUILD=stack ARGS="--resolver nightly"
 
 before_install:
