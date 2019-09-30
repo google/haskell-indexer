@@ -1,4 +1,4 @@
-resolver: lts-12.9  # GHC 8.4.3
+resolver: lts-13.30
 
 packages:
 - haskell-indexer-backend-core
@@ -13,15 +13,6 @@ packages:
 - text-offset
 
 extra-deps:
-- conduit-1.3.0.3
-- proto-lens-protoc-0.4.0.1
-- proto-lens-combinators-0.4.0.1
-- proto-lens-runtime-0.4.0.1
-- proto-lens-setup-0.4.0.1
-- proto-lens-0.4.0.1
-- lens-labels-0.3.0.1
-- mono-traversable-1.0.9.0
-- resourcet-1.2.1
 
 # Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
 # `proto-lens-protoc` in stack's local DB.  See:
