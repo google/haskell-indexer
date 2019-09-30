@@ -24,22 +24,15 @@ module Language.Haskell.Indexer.Backend.GhcApiSupport
     ) where
 
 -- GHC imports.
-#if __GLASGOW_HASKELL__ >= 800
+import CmdLineParser (Warn(warnMsg))
 import DriverPhases (isHaskellishTarget, Phase(StopLn))
-#else
-import DriverPhases (isHaskellSrcFilename, Phase(StopLn))
-import Util (looksLikeModuleName)
-#endif
 import DriverPipeline (compileFile)
 import DynFlags
+import DynamicLoading (initializePlugins)
 import GHC
 import qualified Linker
 import Outputable
 import qualified Pretty
-
-#if __GLASGOW_HASKELL__ >= 806
-import DynamicLoading (initializePlugins)
-#endif
 
 import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
@@ -58,14 +51,6 @@ import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
 import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
 import Language.Haskell.Indexer.Backend.AnalysisOptions (AnalysisOptions)
 
-import Language.Haskell.Indexer.Backend.Compat
-
-#if __GLASGOW_HASKELL__ < 800
-isHaskellishTarget :: (FilePath, Maybe Phase) -> Bool
-isHaskellishTarget (src,_) =
-    isHaskellSrcFilename src || looksLikeModuleName src
-#endif
-
 printErr :: MonadIO m => String -> m ()
 printErr = liftIO . hPutStrLn stderr
 
@@ -77,11 +62,7 @@ showSDocForUserOneLine dflags unqual doc =
                        , Pretty.lineLength = pprCols dflags
                        }
    in Pretty.renderStyle s $
-#if __GLASGOW_HASKELL__ >= 802
         runSDoc doc (initSDocContext dflags (mkUserStyle dflags unqual AllTheWay))
-#else
-        runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay))
-#endif
 
 -- | Must be called serialized - due to some global linker state GHC API
 -- can't process multiple compilations concurrently (see
@@ -205,14 +186,12 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         let env = GhcEnv (showSDocOneLine usedDflags . ppr)
                          (showSDocForUserOneLine usedDflags neverQualify . ppr)
             extractXref = analyseTypechecked env analysisOpts
-#if __GLASGOW_HASKELL__ >= 806
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
-#else
-        mapM (parseModule >=> typecheckModule >=> extractXref) (mgModSummaries graph)
-#endif
     mapM_ xrefSink xrefGraph
  where
+    getWarnMsg :: Warn -> String
+    getWarnMsg = unLoc . warnMsg
     -- | RTS args would tune performance of the compilation. But we can't set
     -- them per-compilation from 'GhcApiSupport', so drop them.
     partitionRtsArgs :: [String] -> ([String], [String])
@@ -239,11 +218,7 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
     magicLink :: Ghc ()
     magicLink = do
         printErr "MagicLink happens."
-#if __GLASGOW_HASKELL__ >= 800
         state <- GHC.getSession
-#else
-        state <- getSessionDynFlags
-#endif
         liftIO $ do
             Linker.initDynLinker state
             -- As described in the gist, this doesn't unload everything, but at
@@ -254,11 +229,9 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
 
-#if __GLASGOW_HASKELL__ >= 806
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary
 loadModulePlugins modsum = do
     hsc_env <- getSession
     dynflags' <- liftIO (initializePlugins hsc_env (ms_hspp_opts modsum))
     return $ modsum { ms_hspp_opts = dynflags' }
-#endif

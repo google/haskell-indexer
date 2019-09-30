@@ -22,7 +22,6 @@ library
                        Language.Haskell.Indexer.Backend.GhcArgs
                        Language.Haskell.Indexer.Backend.GhcApiSupport
                        Language.Haskell.Indexer.Backend.GhcEnv
-  other-modules:       Language.Haskell.Indexer.Backend.Compat
   build-depends:       base >=4.8 && <5
                      , containers
                      , directory
