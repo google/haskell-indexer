@@ -22,7 +22,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-| Converts GHC typechecked AST into intermediate Analysed format.
 
 This module should not assume anything about the backend consuming the
@@ -548,27 +547,6 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
     }
 
 
-data AbsBindsKind = NormalAbs | SigAbs
-    deriving (Eq)
-
-maybeAbsBinds
-    :: HsBindLR idL idR
-    -> Maybe (LHsBinds idL, [(IdP idL, Maybe (IdP idL))], AbsBindsKind)
-maybeAbsBinds AbsBinds { abs_exports = exports, abs_binds = binds, abs_sig = sig} =
-    let ids = map (abe_poly &&& (Just . abe_mono)) exports
-        binds_type = if sig then SigAbs else NormalAbs
-    in Just $! (binds, ids, binds_type)
-maybeAbsBinds _ = Nothing
-
-pattern AbsBindsPat
-    :: LHsBinds idL
-    -> [(IdP idL, Maybe (IdP idL))]
-    -> AbsBindsKind
-    -> HsBindLR idL idR
-pattern AbsBindsPat binds ids abskind <-
-    (maybeAbsBinds -> Just (binds, ids, abskind))
-
-
 -- | Returns the (source-based, generated) bindings.
 --
 -- The matchgroup (~implementation) of compiler-generated bindings should not be
@@ -648,6 +626,10 @@ universeWithParents a = ParentChild Nothing a : go a
            in map (ParentChild (Just $! x)) cs ++ concatMap go cs
 
 
+absExportsToIds :: [ABExport p] -> [(IdP p, Maybe (IdP p))]
+absExportsToIds exports = map (abe_poly &&& (Just . abe_mono)) exports
+
+
 -- | Function declarations from the bindings.
 --
 -- There can be overlapping binds in the input, specifically some
@@ -666,16 +648,16 @@ declsFromHsBinds ctx = dedupByTick . concatMap go
   where
     go :: ParentChild (GenLocated SrcSpan (HsBindLR GhcTc GhcTc))
                       -> [DeclAndAlt]
-    go (ParentChild (Just (L _ (AbsBindsPat _ exports k)))
+    go (ParentChild (Just (L _ (AbsBinds {abs_exports = exports, abs_sig = sig})))
                     (L _ (FunBind _ lVar _ _ _)))
-        | k == NormalAbs = []
-        | k == SigAbs =
+        | sig =
             -- Need special handling, since it AbsBindsSig doesn't expose the
             -- monomorphic binding. So we harvest it from the FunBind below.
-            let primary = varDecl ctx . fst . head $ exports
+            let primary = varDecl ctx . fst . head $ absExportsToIds exports
                           -- head is safe here but ugly. Maybe better pattern?
                 alternative = nameInModuleToTick ctx (varName (unLoc lVar))
             in [DeclAndAlt primary (Just $! alternative)]
+        | otherwise = []
     go (ParentChild _ c) = absFunDeclsFromHsBind c
     --
     absFunDeclsFromHsBind :: LHsBind GhcTc -> [DeclAndAlt]
@@ -684,9 +666,10 @@ declsFromHsBinds ctx = dedupByTick . concatMap go
             let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
                                  (varDecl ctx funVar)
             in [DeclAndAlt decl Nothing]
-        AbsBindsPat _ exports _ ->
+        AbsBinds {abs_exports = exports } ->
             let abeVar = uncurry (varDeclAlt ctx)
-            in map abeVar . filter (not . isInstanceMethodVar . fst) $ exports
+            in map abeVar . filter (not . isInstanceMethodVar . fst)
+                  $ absExportsToIds exports
         _ ->
             -- TODO(robinpalotai): anything to do here?
             []
@@ -818,8 +801,9 @@ mkRedirect = (,)
 -- | If the arg is a top-level AbsBinds for a typeclass instance method,
 -- returns the AbsBinds below it - this is an irregularity in the AST.
 instanceAbsBinds :: LHsBindLR GhcTc GhcTc -> Maybe [LHsBindLR GhcTc GhcTc]
-instanceAbsBinds (L _ (AbsBindsPat binds exports _))
-    | (isInstanceMethodVar . fst) `any` exports = Just $! GHC.bagToList binds
+instanceAbsBinds (L _ AbsBinds {abs_exports = exports, abs_binds = binds})
+    | (isInstanceMethodVar . fst) `any` (absExportsToIds exports) =
+        Just $! GHC.bagToList binds
 instanceAbsBinds _ = Nothing
 
 -- | Pulls the AbsBinds below the top one up (if typeclass instance method), or
