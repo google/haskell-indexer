@@ -25,7 +25,7 @@ library
                      , haskell-indexer-translate >= 0.1
                      , kythe-schema >= 0.1
                      , optparse-applicative
-                     , proto-lens >= 0.4 && < 0.5
+                     , proto-lens >= 0.5 && < 0.6
                      , text
   exposed-modules:  Language.Haskell.Indexer.Args
   default-language: Haskell2010
