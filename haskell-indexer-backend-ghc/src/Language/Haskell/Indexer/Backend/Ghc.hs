@@ -285,6 +285,8 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         in top:(ctors ++ tyvars)
       where
         conDecls cd =
+            -- TODO(robinp): all ctors
+            -- https://github.com/google/haskell-indexer/issues/108
             let conLName = head (conDeclNames cd)
             in dataLikeDecl cd conLName
         conDeclNames (ConDeclH98 { con_name = conName })  = [conName]
@@ -545,7 +547,6 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
     , tickUniqueInModule = False
     , tickTermLevel = True
     }
-
 
 -- | Returns the (source-based, generated) bindings.
 --
