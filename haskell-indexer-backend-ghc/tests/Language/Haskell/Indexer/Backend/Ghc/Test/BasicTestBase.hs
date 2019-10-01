@@ -338,46 +338,59 @@ assertRefKind expected tick =
         $ assertFailure
         $ show expected ++ " expected; got " ++ show actual
 
-testImportRefs :: AssertionInEnv
-testImportRefs = assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefs.hs"]
+testImpExpRefs :: AssertionInEnv
+testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
   $ do
     -- foo
     declAt (9, 1) >>= usages >>= \case
-      [u1, u2] -> do
+      [u1, u2, u3] -> do
         includesPos (3, 25) u1 -- import statement in ImportRefs.hs
         assertRefKind Import u1
-        includesPos (8, 1) u2 -- type signature in ImportDefs.hs
+        includesPos (4, 5) u2 -- export list in ImpExpDefs.hs
+        includesPos (8, 1) u3 -- type signature in ImpExpDefs.hs
       us -> checking $ assertFailure "Usage count differs for foo"
     -- bar
     declAt (12, 1) >>= usages >>= \case
-      [u1, u2] -> do
-        includesPos (3, 20) u1 -- import statement in ImportRefs.hs
-        assertRefKind Import u1
-        includesPos (11, 1) u2 -- type signature in ImportDefs.hs
+      [u1, u2, u3] -> do
+        includesPos (3, 5) u1 -- export list in ImpExpDefs.hs
+        includesPos (3, 20) u2 -- import statement in ImportRefs.hs
+        assertRefKind Import u2
+        includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
       us -> checking $ assertFailure "Usage count differs for bar"
     -- FooBar
     declAt (14, 6) >>= usages >>= \case
-      [u1, u2, u3] -> do
-        includesPos (4, 20) u1
-        includesPos (5, 20) u2
-        includesPos (6, 20) u3
+      [u1, u2, u3, u4] -> do
+        includesPos (2, 5) u1 -- export list in ImpExpDefs.h
+        includesPos (4, 20) u2
+        includesPos (5, 20) u3
+        includesPos (6, 20) u4
       us -> checking $ assertFailure "Usage count differs for FooBar"
     -- MkFooBar
-    declAt (15, 5) >>= singleUsage >>= includesPos (6, 28)
+    declAt (15, 5) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (2, 13) u1 -- export list in ImpExpDefs.h
+        includesPos (6, 28) u2
     -- fbFoo
-    declAt (16, 9) >>= singleUsage >>= includesPos (6, 38)
+    declAt (16, 9) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (2, 23) u1 -- export list in ImpExpDefs.h
+        includesPos (6, 38) u2
     -- fbBar
-    declAt (17, 9) >>= singleUsage >>= includesPos (6, 45)
+    declAt (17, 9) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (2, 30) u1 -- export list in ImpExpDefs.h
+        includesPos (6, 45) u2
 
 testImportRefsHiding :: AssertionInEnv
 testImportRefsHiding =
-  assertXRefsFrom ["basic/ImportDefs.hs", "basic/ImportRefsHiding.hs"]
+  assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefsHiding.hs"]
     $ do
       declAt (12, 1) >>= usages >>= \case
-        [u1, u2] -> do
-          includesPos (3, 27) u1 -- import statement in ImportRefsHiding.hs
-          assertRefKind Ref u1
-          includesPos (11, 1) u2 -- type signature in ImportDefs.hs
+        [u1, u2, u3] -> do
+          includesPos (3, 5) u1 -- export list in ImpExpDefs.hs
+          includesPos (3, 27) u2 -- import statement in ImportRefsHiding.hs
+          assertRefKind Ref u2
+          includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
         us -> checking $ assertFailure "Usage count differs for bar"
 
 -- | Prepares the tests to run with the given test environment.
@@ -405,7 +418,7 @@ allTests env =
     , envTestCase "data-con-wrap" testDataConWrap
     , envTestCase "utf8" testUtf8
     , envTestCase "imports" testImports
-    , envTestCase "import-refs" testImportRefs
+    , envTestCase "import-export-refs" testImpExpRefs
     , envTestCase "import-refs-hiding" testImportRefsHiding
     ]
   where

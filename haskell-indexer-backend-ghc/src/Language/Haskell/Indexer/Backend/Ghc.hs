@@ -35,6 +35,7 @@ module Language.Haskell.Indexer.Backend.Ghc
     ) where
 
 -- GHC API imports
+import Avail (Avails)
 -- TODO(robinpalotai) qualify these
 import qualified Bag as GHC
 import qualified BasicTypes as GHC
@@ -420,7 +421,7 @@ generateRefEdgeForHiddenImports = True
 -- which are only present in the renamed tree.
 refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
-refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
+refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
@@ -429,9 +430,10 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
                 error "should not hit ValBinds when accessing renamed AST"
             XValBindsLR (NValBinds _ lsigs) -> concatMap refsFromSignature lsigs
         importRefs = concatMap refsFromImportDecl importDecls
+        exportRefs = refsFromExports exports
         refContext = Nothing
     in map (toTickReference ctx refContext declAlts)
-           (typeRefs ++ sigRefs ++ importRefs)
+           (typeRefs ++ sigRefs ++ importRefs ++ exportRefs)
   where
     refsFromHsType :: LHsType GhcRn -> Maybe Reference
     refsFromHsType (L l ty) = case hsTypeVarName ty of
@@ -448,27 +450,31 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
         _ -> []
 
+    refsFromExports :: Maybe [(LIE GhcRn, Avails)] -> [Reference]
+    refsFromExports Nothing = []
+    refsFromExports (Just exs) = concatMap (refsFromLIE Ref . fst) exs
+
     refsFromImportDecl :: LImportDecl GhcRn -> [Reference]
     refsFromImportDecl (L _ idecl) = case idecl of
       ImportDecl {..} ->
         case ideclHiding of
           Nothing -> []
           Just (False, (L _ imports)) ->
-            concatMap (refsFromImport Import) imports
+            concatMap (refsFromLIE Import) imports
           Just (True, (L _ imports))
             | generateRefEdgeForHiddenImports ->
-              concatMap (refsFromImport Ref) imports
+              concatMap (refsFromLIE Ref) imports
             | otherwise -> []
       _ -> []
 
-    refsFromImport :: ReferenceKind -> LIE GhcRn -> [Reference]
-    refsFromImport refKind (L _ (IEVar _ (L l n))) =
+    refsFromLIE :: ReferenceKind -> LIE GhcRn -> [Reference]
+    refsFromLIE refKind (L _ (IEVar _ (L l n))) =
       maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
-    refsFromImport refKind (L _ (IEThingAbs _ (L l n))) =
+    refsFromLIE refKind (L _ (IEThingAbs _ (L l n))) =
       maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
-    refsFromImport refKind (L _ (IEThingAll _ (L l n))) =
+    refsFromLIE refKind (L _ (IEThingAll _ (L l n))) =
       maybeToList $ give ctx (nameLocToRef (ieWrappedName n) refKind l)
-    refsFromImport refKind (L _ (IEThingWith _ (L tl tn) _ ctors fields)) =
+    refsFromLIE refKind (L _ (IEThingWith _ (L tl tn) _ ctors fields)) =
       typeRef ++ ctorRefs ++ fieldRefs
       where
         typeRef =
@@ -485,7 +491,7 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, _, _) =
                 give ctx (nameLocToRef (flSelector label) refKind fl)
             )
             fields
-    refsFromImport _ _ = []
+    refsFromLIE _ _ = []
 
 -- | Exports subclasses/overrides relationships from typeclasses.
 relationsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource

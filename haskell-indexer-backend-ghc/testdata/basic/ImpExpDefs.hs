@@ -1,5 +1,5 @@
 module ImportDefs
-  ( FooBar (..),
+  ( FooBar (MkFooBar, fbFoo, fbBar),
     bar,
     foo,
   )
