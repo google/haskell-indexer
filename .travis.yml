@@ -132,7 +132,7 @@ install:
 
       # Note: cabal 2.4(.1?) seems to miss fixes from https://github.com/haskell/cabal/issues/5788,
       # making some options such as --ghc-options absent.
-      cabal v2-install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+      cabal v2-install --only-dependencies --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
       ;;
   esac
   set +ex
@@ -165,7 +165,7 @@ script:
       done
       ;;
     cabal-new)
-      cabal v2-install --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+      cabal v2-install --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
       cabal v2-test --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
 
       ORIGDIR=$(pwd)
