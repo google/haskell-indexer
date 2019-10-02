@@ -124,7 +124,7 @@ install:
       ;;
     cabal-new)
       cabal --version
-      travis_retry cabal update
+      travis_retry cabal v2-update
 
       # Get the list of packages from the stack.yaml file
       # See https://github.com/commercialhaskell/stack/issues/3238
