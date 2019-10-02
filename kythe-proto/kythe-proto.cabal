@@ -10,7 +10,7 @@ maintainer:          robinpalotai@google.com
 copyright:           Google Inc.
 category:            Language
 build-type:          Custom
-cabal-version:       >=1.22
+cabal-version:       2.0
 extra-source-files:  third_party/kythe/kythe/proto/storage.proto
 
 library
