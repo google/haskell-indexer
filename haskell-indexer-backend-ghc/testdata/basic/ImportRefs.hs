@@ -1,6 +1,6 @@
 module ImportRefs where
 
-import ImportDefs (bar, foo)                        -- IEVar
-import ImportDefs (FooBar)                          -- IEThingAbs
-import ImportDefs (FooBar (..))                     -- IEThingAll
-import ImportDefs (FooBar (MkFooBar, fbFoo, fbBar)) -- IEThingWith
+import ImpExpDefs (bar, foo)                        -- IEVar
+import ImpExpDefs (FooBar)                          -- IEThingAbs
+import ImpExpDefs (FooBar (..))                     -- IEThingAll
+import ImpExpDefs (FooBar (MkFooBar, fbFoo, fbBar)) -- IEThingWith

@@ -1,6 +1,11 @@
-module ImportDefs
-  ( FooBar (..),
+module ImpExpDefs
+-- - @FooBar ref TypeD
+-- - @MkFB ref CtorD
+-- - @fbFoo ref FieldFbFoo
+  ( FooBar (MkFB, fbFoo),
+-- - @bar ref BarVar
     bar,
+-- - @foo ref FooVar
     foo,
   )
 where
