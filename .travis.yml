@@ -113,6 +113,25 @@ install:
 - if [ -f configure.ac ]; then autoreconf -i; fi
 - |
   set -ex
+  # Note: extracting common part to function, since OSX bash doesn't support
+  # case fallthrough with ;&
+  cabal_new () {
+    cabal --version
+
+    # This will add some options only used in v2-, like symlink-bindir.
+    cabal user-config update
+
+    travis_retry cabal v2-update
+
+    # Note: cabal 2.4(.1?) seems to miss fixes from https://github.com/haskell/cabal/issues/5788,
+    # making some options such as --ghc-options absent.
+    #
+    # Note 2: see https://github.com/haskell/cabal/issues/5650 about
+    # v2-install not liking --enable-tests + --only-dependencies, thus using
+    # v2-build. Which should be ok - we don't need deps installed (it doesn't
+    # even make much sense in v2).
+    cabal v2-build --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+  }
   case "$BUILD" in
     stack)
       stack --no-terminal --install-ghc $ARGS test --bench --only-dependencies
@@ -129,27 +148,10 @@ install:
       ;;
     cabal-new-no-freeze)
       rm cabal.project.freeze
-      ;&  # FALLS THROUGH
+      cabal_new
+      ;;
     cabal-new)
-      cabal --version
-
-      # This will add some options only used in v2-, like symlink-bindir.
-      cabal user-config update
-
-      travis_retry cabal v2-update
-
-      # Get the list of packages from the stack.yaml file
-      # See https://github.com/commercialhaskell/stack/issues/3238
-      PACKAGES=$(stack --install-ghc query locals | grep '^ *path' | sed 's@^ *path:@@')
-
-      # Note: cabal 2.4(.1?) seems to miss fixes from https://github.com/haskell/cabal/issues/5788,
-      # making some options such as --ghc-options absent.
-      #
-      # Note 2: see https://github.com/haskell/cabal/issues/5650 about
-      # v2-install not liking --enable-tests + --only-dependencies, thus using
-      # v2-build. Which should be ok - we don't need deps installed (it doesn't
-      # even make much sense in v2).
-      cabal v2-build --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+      cabal_new
       ;;
   esac
   set +ex
@@ -157,6 +159,18 @@ install:
 script:
 - |
   set -ex
+  cabal_new () {
+    cabal v2-build --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+    cabal v2-test --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+
+    ORIGDIR=$(pwd)
+    for dir in $PACKAGES
+    do
+      cd $dir
+      cabal check
+      cd $ORIGDIR
+    done
+  }
   case "$BUILD" in
     stack)
       stack --no-terminal $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
@@ -183,18 +197,10 @@ script:
       ;;
     cabal-new-no-freeze)
       test ! -f cabal.project.freeze
-      ;&  # FALLS THROUGH
+      cabal_new
+      ;;
     cabal-new)
-      cabal v2-build --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
-      cabal v2-test --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
-
-      ORIGDIR=$(pwd)
-      for dir in $PACKAGES
-      do
-        cd $dir
-        cabal check
-        cd $ORIGDIR
-      done
+      cabal_new
       ;;
   esac
   set +ex
