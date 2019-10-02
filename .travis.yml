@@ -132,6 +132,10 @@ install:
       ;&  # FALLS THROUGH
     cabal-new)
       cabal --version
+
+      # This will add some options only used in v2-, like symlink-bindir.
+      cabal user-config update
+
       travis_retry cabal v2-update
 
       # Get the list of packages from the stack.yaml file
