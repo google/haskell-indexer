@@ -1,4 +1,4 @@
-module ImportDefs
+module ImpExpDefs
 -- - @FooBar ref TypeD
 -- - @MkFB ref CtorD
 -- - @fbFoo ref FieldFbFoo

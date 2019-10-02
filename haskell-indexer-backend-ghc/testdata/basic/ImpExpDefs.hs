@@ -1,4 +1,4 @@
-module ImportDefs
+module ImpExpDefs
   ( FooBar (MkFooBar, fbFoo, fbBar),
     bar,
     foo,
