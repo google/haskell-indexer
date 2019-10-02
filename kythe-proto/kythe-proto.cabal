@@ -10,7 +10,7 @@ maintainer:          robinpalotai@google.com
 copyright:           Google Inc.
 category:            Language
 build-type:          Custom
-cabal-version:       >=1.22
+cabal-version:       2.0
 extra-source-files:  third_party/kythe/kythe/proto/storage.proto
 
 library
@@ -18,6 +18,7 @@ library
                      , Proto.Kythe.Proto.Storage_Fields
   autogen-modules:     Proto.Kythe.Proto.Storage
                      , Proto.Kythe.Proto.Storage_Fields
+  build-tool-depends:  proto-lens-protoc:proto-lens-protoc >= 0.5
   build-depends:       base >=4.8 && <5
                      , proto-lens-runtime >= 0.5 && < 0.6
   default-language:    Haskell2010
@@ -25,5 +26,4 @@ library
 custom-setup
   setup-depends:       base >=4.8 && <5
                      , Cabal
-                     , proto-lens-protoc >= 0.5 && < 0.6
                      , proto-lens-setup == 0.4.0.2

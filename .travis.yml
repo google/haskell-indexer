@@ -38,6 +38,15 @@ matrix:
     compiler: ": #GHC 8.6.5"
     addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
+  - env: BUILD=cabal-new GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #cabal new-build"
+    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+
+  - env: BUILD=cabal-new-no-freeze GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #cabal new-build w/o freeze file"
+    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+
+
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
   - env: BUILD=cabal GHCVER=head CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
@@ -104,6 +113,25 @@ install:
 - if [ -f configure.ac ]; then autoreconf -i; fi
 - |
   set -ex
+  # Note: extracting common part to function, since OSX bash doesn't support
+  # case fallthrough with ;&
+  cabal_new () {
+    cabal --version
+
+    # This will add some options only used in v2-, like symlink-bindir.
+    cabal user-config update
+
+    travis_retry cabal v2-update
+
+    # Note: cabal 2.4(.1?) seems to miss fixes from https://github.com/haskell/cabal/issues/5788,
+    # making some options such as --ghc-options absent.
+    #
+    # Note 2: see https://github.com/haskell/cabal/issues/5650 about
+    # v2-install not liking --enable-tests + --only-dependencies, thus using
+    # v2-build. Which should be ok - we don't need deps installed (it doesn't
+    # even make much sense in v2).
+    cabal v2-build --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+  }
   case "$BUILD" in
     stack)
       stack --no-terminal --install-ghc $ARGS test --bench --only-dependencies
@@ -118,12 +146,31 @@ install:
 
       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
       ;;
+    cabal-new-no-freeze)
+      rm cabal.project.freeze
+      cabal_new
+      ;;
+    cabal-new)
+      cabal_new
+      ;;
   esac
   set +ex
 
 script:
 - |
   set -ex
+  cabal_new () {
+    cabal v2-build --enable-tests --enable-benchmarks --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+    cabal v2-test --force-reinstalls -O0 --reorder-goals --max-backjumps=-1 $CABALARGS all
+
+    ORIGDIR=$(pwd)
+    for dir in $PACKAGES
+    do
+      cd $dir
+      cabal check
+      cd $ORIGDIR
+    done
+  }
   case "$BUILD" in
     stack)
       stack --no-terminal $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
@@ -147,6 +194,13 @@ script:
         cabal test
         cd $ORIGDIR
       done
+      ;;
+    cabal-new-no-freeze)
+      test ! -f cabal.project.freeze
+      cabal_new
+      ;;
+    cabal-new)
+      cabal_new
       ;;
   esac
   set +ex
