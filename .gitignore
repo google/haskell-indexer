@@ -6,3 +6,5 @@
 .projectile
 **/dist
 *.yaml.lock
+dist-newstyle
+.ghc.*

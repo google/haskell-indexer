@@ -21,4 +21,4 @@ explicit-setup-deps:
   "*": true
 
 nix:
-  packages: [gcc, protobuf3_2]
+  packages: [gcc, protobuf]

@@ -22,6 +22,7 @@ Stackage:
 Previous compilers were supported at some point. Checkout an old repository
 state if interested:
   - [GHC 7.10.3](https://github.com/google/haskell-indexer/tree/last-ghc-7.10.3)
+  - [GHC 8.4](https://github.com/google/haskell-indexer/tree/last-ghc-8.4)
 
 [![Build Status](https://travis-ci.org/google/haskell-indexer.svg?branch=master)](https://travis-ci.org/google/haskell-indexer)
 
