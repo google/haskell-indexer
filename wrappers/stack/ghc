@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # GHC wrapper for indexing Haskell packages.
 # Note that variables INDEXER_OUTPUT_DIR and REALGHC are set outside this script.
 
@@ -17,13 +19,43 @@ RESULT=$?
 # we are only interested when `--make` is specified.
 if [[ "${@#--make}" != "$@" ]]; then
   PKG=${PWD##*/}
+  log " == pkg: $PKG"
+  EXE_FOUND=false
+  # GHC is invoked twice for executable modules, first with "-no-link" but with
+  # no "-o" argument specified, this flag prevents that run from overwriting
+  # librarie entries file
+  NO_LINK=false
+  for i in "$@"
+  do
+    if [ "$EXE_FOUND" = true ]
+    then
+      EXE="$(basename $i)"
+      EXE_SUFFIX="-$EXE"
+      RENAME_MAIN="--rename_main $PKG$EXE_SUFFIX"
+      log " == exe-suffix: $EXE_SUFFIX"
+      break
+    elif [ "$i" = "-o" ]; then
+      EXE_FOUND=true
+    elif [ "$i" = "-no-link" ]; then
+      NO_LINK=true
+    fi
+  done
   log "== Invoking indexer"
+  PATH_NO_EXT="$INDEXER_OUTPUT_DIR/${PKG}${EXE_SUFFIX}"
+  if [ "$NO_LINK" = true ]
+  then
+    ENTRIES_FILE=/dev/null
+  else
+    ENTRIES_FILE="$PATH_NO_EXT.entries"
+  fi
+  log "== Output entries file: $ENTRIES_FILE"
   if ! ghc_kythe_wrapper \
     --drop_path_prefix './' \
     --prepend_path_prefix "$PKG/" \
+    $RENAME_MAIN \
     -- \
-    "$@" > "$INDEXER_OUTPUT_DIR/$PKG.entries" 2> "$INDEXER_OUTPUT_DIR/$PKG.stderr"; then
-    echo "$PKG had error" >> "$INDEXER_OUTPUT_DIR/errors"
+    "$@" > "$ENTRIES_FILE" 2>> "$PATH_NO_EXT.stderr"; then
+    echo "${PKG}${EXE_SUFFIX} had error" >> "$INDEXER_OUTPUT_DIR/errors"
   fi
 fi
 exit $RESULT
