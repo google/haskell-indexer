@@ -15,9 +15,9 @@
 # limitations under the License.
 
 # TODO(robinp): take these from outer env if present.
-GHC_KYTHE=ghc_kythe_wrapper
+GHC_KYTHE="${GHC_KYTHE:-ghc_kythe_wrapper}"
 KYTHE_DIR="${KYTHE_DIR:-/opt/kythe}"
-VERIFIER=$KYTHE_DIR/tools/verifier
+VERIFIER="${VERIFIER:-$KYTHE_DIR/tools/verifier}"
 
 BASIC="testdata/basic"
 
@@ -55,7 +55,7 @@ for fut in \
     "$BASIC/TypeDef.hs"
 do
   echo "Verifying: $fut"
-  $GHC_KYTHE -- --check_for_singletons=true $fut 2> /dev/null | $VERIFIER -goal_prefix '-- -' $fut \
+  $GHC_KYTHE -- $fut 2> /dev/null | $VERIFIER -goal_prefix '-- -' --check_for_singletons=true $fut \
     || die
 done
 
