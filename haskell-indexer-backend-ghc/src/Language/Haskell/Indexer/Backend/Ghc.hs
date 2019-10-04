@@ -42,6 +42,7 @@ import qualified BasicTypes as GHC
 import qualified ConLike
 import qualified DataCon as GHC
 import qualified Name as GHC
+import BooleanFormula
 import FastString (unpackFS)
 import FieldLabel (FieldLbl (..))
 import GHC
@@ -448,7 +449,29 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
     refsFromSignature (L _ sig) = case sig of
         TypeSig _ names _ ->
             mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
+        (PatSynSig lnames _) ->
+          lkupSigNames [lnames]
+        (FixSig (FixitySig lnames _)) ->
+          lkupSigNames lnames
+        (InlineSig lname _) -> lkupSigNames [lname]
+        (SpecSig lname ltypes _) -> lkupSigNames [lname]
+        (SpecInstSig st lst) -> []
+        (MinimalSig st lbf) -> lkupSigNames (namesFromLBooleanFormula lbf)
         _ -> []
+      where
+        lkupSigNames names =
+          mapMaybe (\(L l n) -> give ctx (nameLocToRef n Ref l)) names
+
+namesFromBooleanFormula :: BooleanFormula a -> [a]
+namesFromBooleanFormula bf =
+  case bf of
+    Var a -> [a]
+    And lbfs -> concatMap namesFromLBooleanFormula lbfs
+    Or lbfs -> concatMap namesFromLBooleanFormula lbfs
+    Parens lbf -> namesFromLBooleanFormula lbf
+
+namesFromLBooleanFormula :: LBooleanFormula a -> [a]
+namesFromLBooleanFormula (L _ bf) = namesFromBooleanFormula bf
 
     refsFromExports :: Maybe [(LIE GhcRn, Avails)] -> [Reference]
     refsFromExports Nothing = []
