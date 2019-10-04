@@ -32,6 +32,7 @@ library
                      , haskell-indexer-backend-core >= 0.1
                      , haskell-indexer-translate >= 0.1
                      , mtl
+                     , network-uri >= 2.6 && < 3
                      , reflection >= 1.2
                      , text
                      , transformers

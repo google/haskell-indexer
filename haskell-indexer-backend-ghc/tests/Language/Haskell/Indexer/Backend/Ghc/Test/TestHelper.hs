@@ -106,6 +106,7 @@ mergeRefs = Foldable.foldr1 merge
         { xrefFile = xrefFile a
         , xrefModule = xrefModule a
         , xrefDecls = xrefDecls a ++ xrefDecls b
+        , xrefDocDecls = xrefDocDecls a ++ xrefDocDecls b
         , xrefCrossRefs = xrefCrossRefs a ++ xrefCrossRefs b
         , xrefRelations = xrefRelations a ++ xrefRelations b
         , xrefImports = xrefImports a ++ xrefImports b

@@ -393,6 +393,17 @@ testImportRefsHiding =
           includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
         us -> checking $ assertFailure "Usage count differs for bar"
 
+testDocUri :: AssertionInEnv
+testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
+  declWithDocUri
+    "https://hackage.haskell.org/package/ghc-prim-0.5.3/docs/src/GHC.Types.html#IO"
+    >>= singleUsage
+    >>= includesPos (3, 6)
+  declWithDocUri
+    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/System.IO.html#putStrLn"
+    >>= singleUsage
+    >>= includesPos (4, 5)
+
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
 allTests env =
@@ -420,6 +431,7 @@ allTests env =
     , envTestCase "imports" testImports
     , envTestCase "import-export-refs" testImpExpRefs
     , envTestCase "import-refs-hiding" testImportRefsHiding
+    , envTestCase "doc-uri" testDocUri
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

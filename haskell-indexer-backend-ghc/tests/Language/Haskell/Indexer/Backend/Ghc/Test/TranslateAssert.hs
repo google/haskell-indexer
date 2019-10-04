@@ -22,6 +22,7 @@ module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     , funk, bind2
     --
     , declsAt, declAt
+    , declsWithDocUri, declWithDocUri
     --
     , usages, singleUsage
     --
@@ -78,6 +79,29 @@ declAt pos = declsAt pos >>= \case
     [d] -> return d
     ds -> failConcat
         [ "Multiple declarations at pos ", show pos
+        , ":\n", prettyDecls ds
+        ]
+
+declsWithDocUri :: T.Text -> ReaderT XRef IO [Decl]
+declsWithDocUri uri = do
+    decls <- asks xrefDecls
+    let filtered =
+          filter
+            ( \d -> case tickDocUri . declTick $ d of
+                Nothing -> False
+                Just u -> u == uri
+            )
+            decls
+    liftIO $ not (null filtered) @? concat
+        [ "No declarations with doc/uri ", T.unpack uri]
+    return $! L.sortBy (comparing declTick) filtered
+
+declWithDocUri :: T.Text -> ReaderT XRef IO Decl
+declWithDocUri uri = declsWithDocUri uri >>= \case
+    [] -> error "declsWithDocUri should have caught empty decls"
+    [d] -> return d
+    ds -> failConcat
+        [ "Multiple declarations with doc/uri ", T.unpack uri
         , ":\n", prettyDecls ds
         ]
 

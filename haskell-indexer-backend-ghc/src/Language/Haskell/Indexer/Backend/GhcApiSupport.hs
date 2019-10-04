@@ -39,6 +39,7 @@ import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
 import qualified Data.List as L
+import qualified Data.Set as S
 
 import GHC.Paths (libdir)
 import System.FilePath ((</>))
@@ -188,7 +189,8 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             extractXref = analyseTypechecked env analysisOpts
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
-    mapM_ xrefSink xrefGraph
+    let xrefGraph' = postProcessDocDecls xrefGraph
+    mapM_ xrefSink xrefGraph'
  where
     getWarnMsg :: Warn -> String
     getWarnMsg = unLoc . warnMsg
@@ -228,6 +230,18 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- TODO(robinpalotai): link packages? See 'reallyInitDynLinker'.
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
+
+-- | Doc decls are for things that don't have source code available; most
+-- possibly those from core packages. Hence their decls may be duplicated
+-- coming from multiple analyses. Depuplicate them, and put them in the
+-- 'xrefDecls' field of the first 'XRef'.
+postProcessDocDecls :: [XRef] -> [XRef]
+postProcessDocDecls graph =
+    let docDecls = concatMap xrefDocDecls graph
+        deduped = S.toList $ foldr S.insert S.empty docDecls
+     in case graph of
+            [] -> []
+            x : xs -> x {xrefDecls = xrefDecls x ++ deduped} : xs
 
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary

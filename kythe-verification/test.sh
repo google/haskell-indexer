@@ -44,6 +44,7 @@ for fut in \
     "$BASIC/Anchors.hs" \
     "$BASIC/CrossRef1.hs $BASIC/CrossRef2.hs" \
     "$BASIC/DataRef.hs" \
+    "$BASIC/DocUri.hs" \
     "$BASIC/FunctionArgRef.hs" \
     "$BASIC/ImpExpDefs.hs $BASIC/ImportRefs.hs" \
     "$BASIC/LocalRef.hs" \

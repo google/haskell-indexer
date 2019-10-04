@@ -61,7 +61,7 @@ import Data.Either (partitionEithers)
 import Data.Function (on)
 import Data.List (partition, sortBy, groupBy)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, mapMaybe, maybeToList)
 import Data.Monoid ((<>))
 import Data.Ord (comparing)
 import Data.Reflection (Given, give, given)
@@ -69,6 +69,7 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
+import Network.URI (escapeURIString, isUnescapedInURIComponent)
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -137,15 +138,54 @@ analyseTypechecked' ghcEnv opts modSummary renSource tcSource (mod', mspan) = do
           renamedRefs = fromMaybe [] (refsFromRenamed ctx altMap <$> renSource)
       rels = fromMaybe [] (relationsFromRenamed ctx altMap <$> renSource)
       decls = map daDecl declsAlts
+      docDecls = generateDocDecls refs
   imports <- fromMaybe (return []) (importsFromRenamed ctx <$> renSource)
-  return $ XRef (AnalysedFile (SourcePath modFile) strippedModFile) moduleTick
-            decls refs rels imports
+  return $ XRef
+      { xrefFile = (AnalysedFile (SourcePath modFile) strippedModFile)
+      , xrefModule = moduleTick
+      , xrefDecls = decls
+      , xrefDocDecls = docDecls
+      , xrefCrossRefs = refs
+      , xrefRelations = rels
+      , xrefImports = imports
+      }
   where
     declAltMap :: [DeclAndAlt] -> DeclAltMap
     declAltMap = M.fromList . mapMaybe toPair
       where
         toPair (DeclAndAlt d (Just alt)) = Just (alt, declTick d)
         toPair _ = Nothing
+
+-- | Generate decls that point to hackage documents.
+-- These decls are mainly for things from GHC core packages. Their source code
+-- is not available but we can make them point to their documents.
+generateDocDecls :: [TickReference] -> [Decl]
+generateDocDecls refs =
+  -- Deduplicate by URI strings.
+  let uriTickMap =
+        foldr
+          ( \r acc ->
+              let targetTick = refTargetTick r
+               in case tickDocUri targetTick of
+                    Nothing -> acc
+                    Just uri -> M.insert uri targetTick acc
+          )
+          M.empty
+          refs
+   in map
+        ( \(uri, tick) ->
+            -- Generate "fake" decls.
+            Decl
+              { declTick = tick,
+                declIdentifierSpan = Nothing,
+                declType = StringyType
+                  { declQualifiedType = uri,
+                    declUserFriendlyType = uri
+                  },
+                declExtra = Nothing
+              }
+        )
+        (M.toList uriTickMap)
 
 -- | Bundles a declaration with an alternative reference, if any.
 -- The alternate reference can be used by other AST elements to refer to the
@@ -410,6 +450,7 @@ makeInstanceTick ctx splitType = Tick
     , tickUniqueInModule = False
       -- Could be True, but let's keep False, which is more in line with AST.
     , tickTermLevel = False
+    , tickDocUri = Nothing
     }
 
 -- | Whether to generate a Ref edge from hidden imported entities to their
@@ -552,6 +593,7 @@ makeInstanceMethodTick ctx (L l classMethod) = Tick
     , tickSpan = give ctx (srcSpanToSpan l)
     , tickUniqueInModule = False
     , tickTermLevel = True
+    , tickDocUri = Nothing
     }
 
 -- | Returns the (source-based, generated) bindings.
@@ -1081,6 +1123,25 @@ nameLocToRef
     => Name -> ReferenceKind -> SrcSpan -> Maybe Reference
 nameLocToRef n k s = Reference n k <$> srcSpanToSpan s
 
+hackageSrcUrl :: ExtractCtx -> Module -> Name -> Text
+hackageSrcUrl ctx m n =
+  let pkg = showOutputable ctx $ moduleUnitId m
+      modName = showOutputable ctx $ moduleName m
+      name = showOutputable ctx $ nameOccName n
+   in T.pack
+        $ "https://hackage.haskell.org/package/"
+          ++ escape pkg
+          ++ "/docs/src/"
+          ++ escape modName
+          ++ ".html#"
+          ++ escape name
+  where
+    escape :: String -> String
+    escape = escapeURIString isUnescapedInURIComponent
+
+showOutputable :: GHC.Outputable a => ExtractCtx -> a -> String
+showOutputable = ghcPrintUnqualified . ecGhcEnv
+
 {- Note [GHC Names]:
 
    GHC 'Var's/'Name's have a sort, which is roughly Internal or External.
@@ -1119,13 +1180,19 @@ nameInModuleToTick ctx n = Tick
     , tickSpan = nameSpan
     , tickUniqueInModule = isExternalName n
     , tickTermLevel = GHC.isValName n
+    , tickDocUri = docUri
     }
   where
     nameSpan = give ctx (srcSpanToSpan (nameSrcSpan n))
     nModule = fromMaybe (ecModule ctx) (nameModule_maybe n)
     sourcePath = case nameSpan of
-        Nothing -> ecSourcePath ctx
+        Nothing -> SourcePath $ fromJust docUri
         Just s -> spanFile s
+    docUri = case nameSpan of
+        -- An empty name span probably means something from core packages.
+        -- Associate with the hackage document.
+        Nothing -> Just $ hackageSrcUrl ctx nModule n
+        Just _ -> Nothing
 
 nameOccurenceText :: Name -> Text
 nameOccurenceText = T.pack . nameOccurenceString
@@ -1147,4 +1214,3 @@ extractModuleName ctx m =
 
 both :: (a -> b) -> (a,a) -> (b,b)
 both f = f *** f
-

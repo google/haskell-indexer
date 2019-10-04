@@ -78,6 +78,7 @@ data Fact value where
     CompleteF      :: Fact HowComplete
     SnippetStartF  :: Fact Int
     SnippetEndF    :: Fact Int
+    DocUriF        :: Fact ByteString
 
 -- | Renders a fact name to Kythe text value.
 printFact :: Fact v -> Text
@@ -90,6 +91,7 @@ printFact = \case
     CompleteF      -> "/kythe/complete"
     SnippetStartF  -> "/kythe/snippet/start"
     SnippetEndF    -> "/kythe/snippet/end"
+    DocUriF        -> "/kythe/doc/uri"
 
 -- | How complete is the declaration / definition.
 data HowComplete

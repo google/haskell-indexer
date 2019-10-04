@@ -72,6 +72,7 @@ data XRef = XRef
     { xrefFile      :: !AnalysedFile
     , xrefModule    :: !ModuleTick
     , xrefDecls     :: [Decl]
+    , xrefDocDecls  :: [Decl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     , xrefImports :: [ModuleTick]
@@ -118,6 +119,8 @@ data Tick = Tick
       --   TODO(robinpalotai): make the distinction clear? Rename?
     , tickTermLevel :: !Bool
       -- ^ Needed to disambiguate same name occuring in term and type level.
+    , tickDocUri :: !(Maybe Text)
+      -- ^ Used when a node has an associated document URI.
     }
     deriving (Eq, Ord, Show)
 
@@ -138,7 +141,7 @@ data Decl = Decl
       -- ^ Since rarely present, in 'Maybe' to minimize memory usage, and to
       --   let DeclExtra grow without concern.
     }
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | Additional information about the decl, for info that is rarely present.
 data DeclExtra = DeclExtra
@@ -152,7 +155,7 @@ data DeclExtra = DeclExtra
       --   problematic for UI tools. Then the alternateIdSpan can be used by
       --   frontends for example for hyperlinking.
     }
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 emptyExtra :: DeclExtra
 emptyExtra = DeclExtra Nothing Nothing
@@ -176,7 +179,7 @@ data StringyType = StringyType
     { declQualifiedType :: !Text
     , declUserFriendlyType :: !Text
     }
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | Reference to the given tick from the given span.
 data TickReference = TickReference

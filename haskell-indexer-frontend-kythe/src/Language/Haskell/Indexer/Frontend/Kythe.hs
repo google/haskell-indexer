@@ -135,13 +135,16 @@ makeUsageFacts TickReference{..} = do
 
 -- | Makes all entries for a declaration.
 makeDeclFacts :: Decl -> Conversion [Raw.Entry]
-makeDeclFacts decl@Decl{..} = do
+makeDeclFacts decl@Decl {..} = do
     declVName <- tickVName declTick
+    -- /kythe/completes & /kythe/doc/uri facts.
+    let extraFacts = nodeFact CompleteF Definition : case tickDocUri declTick of
+          Nothing -> []
+          Just u -> [nodeFact DocUriF (T.encodeUtf8 u)]
     -- TODO(robinpalotai): use actual node type (Variable is a catch-all now).
     -- TODO(robinpalotai): emit type entries.
     -- TODO(robinpalotai): emit Module childofness if top-level.
-    let declFacts = nodeFacts declVName VariableNK
-                        [ nodeFact CompleteF Definition ]
+    let declFacts = nodeFacts declVName VariableNK extraFacts
     anchorEntries <- makeAnchor (declPreferredUiSpan decl)
                          DefinesBindingE declVName
                          Nothing  -- snippet
