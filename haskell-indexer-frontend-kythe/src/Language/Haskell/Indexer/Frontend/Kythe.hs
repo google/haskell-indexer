@@ -68,6 +68,7 @@ toKythe basevn content XRef{..} = do
                           encodedContent
         env = ConversionEnv filevn pkgvn table basevn
         -- Files are children of the package they belong to.
+        -- This makes more sense for golang, but can't hurt here either.
         pkgFileEntry = edge filevn ChildOfE pkgvn
     sourceList (pkgFileEntry : pkgEntries ++ fileEntries)
     flip runReaderT env $ do
@@ -182,11 +183,9 @@ makeAnchor mbSource anchorEdge targetVName mbSnippet mbRefContext = do
             [ spanOrSubkindFacts
             , snippetFacts
             ]
-    childOfFile <- edge vname ChildOfE <$> asks fileVName
     let edgeEntries =
-            [ childOfFile
-            , edge vname (AnchorEdgeE anchorEdge) targetVName
-            ] ++ maybeToList (edge vname ChildOfE <$> mbRefContext)
+            edge vname (AnchorEdgeE anchorEdge) targetVName
+                : maybeToList (edge vname ChildOfE <$> mbRefContext)
     return $! nodeEntries ++ edgeEntries
   where
     implicits = ( implicitAnchorVName targetVName

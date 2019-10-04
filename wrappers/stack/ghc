@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -50,6 +50,7 @@ if [[ "${@#--make}" != "$@" ]]; then
   fi
   log "== Output entries file: $ENTRIES_FILE"
   if ! ghc_kythe_wrapper \
+    --corpus haskell \
     --drop_path_prefix './' \
     --prepend_path_prefix "$PKG/" \
     $RENAME_MAIN \

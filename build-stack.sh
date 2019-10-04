@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script for building Kythe index of Haskell packages.
 # See usage below.
