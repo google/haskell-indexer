@@ -33,6 +33,7 @@ module Language.Haskell.Indexer.Translate
     , ModuleTick(..)
     , Decl(..)
     , DeclExtra(..), emptyExtra, withExtra
+    , DocUriDecl(..)
     , PkgModule(..)
     , StringyType(..)
     , TickReference(..), ReferenceKind(..)
@@ -72,7 +73,7 @@ data XRef = XRef
     { xrefFile      :: !AnalysedFile
     , xrefModule    :: !ModuleTick
     , xrefDecls     :: [Decl]
-    , xrefDocDecls  :: [Decl]
+    , xrefDocDecls  :: [DocUriDecl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     , xrefImports :: [ModuleTick]
@@ -105,7 +106,7 @@ data ModuleTick = ModuleTick
 --
 -- Not related to GHC's SCC annotations (called ticks internally).
 data Tick = Tick
-    { tickSourcePath :: !SourcePath
+    { tickSourcePath :: !(Maybe SourcePath)
     , tickPkgModule  :: !PkgModule
     , tickThing      :: !Text
       -- ^ The unqualified name of the entity.
@@ -119,14 +120,13 @@ data Tick = Tick
       --   TODO(robinpalotai): make the distinction clear? Rename?
     , tickTermLevel :: !Bool
       -- ^ Needed to disambiguate same name occuring in term and type level.
-    , tickDocUri :: !(Maybe Text)
-      -- ^ Used when a node has an associated document URI.
     }
     deriving (Eq, Ord, Show)
 
 data PkgModule = PkgModule
     { getPackage :: !Text
     , getModule :: !Text
+    , getPackageWithVersion :: !Text
     }
     deriving (Eq, Ord, Show)
 
@@ -140,6 +140,12 @@ data Decl = Decl
     , declExtra :: !(Maybe DeclExtra)
       -- ^ Since rarely present, in 'Maybe' to minimize memory usage, and to
       --   let DeclExtra grow without concern.
+    }
+    deriving (Eq, Show)
+
+data DocUriDecl = DocUriDecl
+    { ddeclTick :: !Tick
+    , ddeclDocUri :: !Text  -- ^ Document URI for the ticket.
     }
     deriving (Eq, Ord, Show)
 
@@ -155,7 +161,7 @@ data DeclExtra = DeclExtra
       --   problematic for UI tools. Then the alternateIdSpan can be used by
       --   frontends for example for hyperlinking.
     }
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 emptyExtra :: DeclExtra
 emptyExtra = DeclExtra Nothing Nothing
@@ -179,7 +185,7 @@ data StringyType = StringyType
     { declQualifiedType :: !Text
     , declUserFriendlyType :: !Text
     }
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 -- | Reference to the given tick from the given span.
 data TickReference = TickReference

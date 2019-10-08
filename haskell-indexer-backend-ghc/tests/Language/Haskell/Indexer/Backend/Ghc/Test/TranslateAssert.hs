@@ -22,9 +22,10 @@ module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     , funk, bind2
     --
     , declsAt, declAt
-    , declsWithDocUri, declWithDocUri
+    , docUriDecl
     --
     , usages, singleUsage
+    , docUriDeclUsages, singleDocUriDeclUsage
     --
     , includesPos, spanIs
     , refKindIs, refContextIs
@@ -82,27 +83,21 @@ declAt pos = declsAt pos >>= \case
         , ":\n", prettyDecls ds
         ]
 
-declsWithDocUri :: T.Text -> ReaderT XRef IO [Decl]
-declsWithDocUri uri = do
-    decls <- asks xrefDecls
-    let filtered =
-          filter
-            ( \d -> case tickDocUri . declTick $ d of
-                Nothing -> False
-                Just u -> u == uri
-            )
-            decls
+docUriDecls :: T.Text -> ReaderT XRef IO [DocUriDecl]
+docUriDecls uri = do
+    decls <- asks xrefDocDecls
+    let filtered = filter ((== uri) . ddeclDocUri) decls
     liftIO $ not (null filtered) @? concat
         [ "No declarations with doc/uri ", T.unpack uri]
-    return $! L.sortBy (comparing declTick) filtered
+    return $! L.sortBy (comparing ddeclTick) filtered
 
-declWithDocUri :: T.Text -> ReaderT XRef IO Decl
-declWithDocUri uri = declsWithDocUri uri >>= \case
-    [] -> error "declsWithDocUri should have caught empty decls"
+docUriDecl :: T.Text -> ReaderT XRef IO DocUriDecl
+docUriDecl uri = docUriDecls uri >>= \case
+    [] -> error "docUriDecls should have caught empty decls"
     [d] -> return d
     ds -> failConcat
         [ "Multiple declarations with doc/uri ", T.unpack uri
-        , ":\n", prettyDecls ds
+        , ":\n", prettyDocUriDecls ds
         ]
 
 prettySpan :: Span -> String
@@ -127,6 +122,19 @@ prettyDecl decl = "Decl { name: " ++ show (tickThing $ declTick decl)
     pos = case declIdentifierSpan decl of
         Just s -> ", pos: " ++ prettySpan s
         Nothing   -> ""
+
+prettyDocUriDecls :: [DocUriDecl] -> String
+prettyDocUriDecls ds = L.intercalate "\n" (map prettyDocUriDecl ds) ++ "\n"
+
+prettyDocUriDecl :: DocUriDecl -> String
+prettyDocUriDecl decl =
+    concat
+        [ "DocUriDecl { name: ",
+          show (tickThing $ ddeclTick decl),
+          ", doc/uri: ",
+          show (ddeclDocUri decl),
+          "}"
+        ]
 
 prettyReference :: TickReference -> String
 prettyReference ref = "TickReference {"
@@ -175,6 +183,26 @@ singleUsage decl = usages decl >>= \case
     [u] -> return u
     us -> failConcat
         [ "Multiple usages of decl ", prettyDecl decl
+        , ":\n", L.intercalate "\n" $ map prettyReference us
+        ]
+
+-- | Returns usages of a given declaration in span-sorted order.
+-- Fails if no usages found.
+docUriDeclUsages :: DocUriDecl -> ReaderT XRef IO [TickReference]
+docUriDeclUsages decl = do
+    res <- filter ((== ddeclTick decl) . refTargetTick) <$> asks xrefCrossRefs
+    liftIO $ not (null res) @? concat
+        [ "No usages found for decl ", prettyDocUriDecl decl ]
+    return $! L.sortBy (comparing refSourceSpan) res
+
+-- | Returns the single usage of the given declaration.
+-- Fails if there isn't exactly one usage.
+singleDocUriDeclUsage :: DocUriDecl -> ReaderT XRef IO TickReference
+singleDocUriDeclUsage decl = docUriDeclUsages decl >>= \case
+    [] -> error "usages should have caught empty usages"
+    [u] -> return u
+    us -> failConcat
+        [ "Multiple usages of decl ", prettyDocUriDecl decl
         , ":\n", L.intercalate "\n" $ map prettyReference us
         ]
 

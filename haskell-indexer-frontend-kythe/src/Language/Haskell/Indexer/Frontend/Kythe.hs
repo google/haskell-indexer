@@ -46,8 +46,7 @@ import Language.Haskell.Indexer.Translate.Utils (tickString)
 
 -- | Data commonly needed while converting Analysis result to Kythe.
 data ConversionEnv = ConversionEnv
-    { fileVName   :: !Raw.VName
-    , pkgVName    :: !Raw.VName
+    { pkgVName    :: !Raw.VName
     , offsets     :: !Offset.OffsetTable
     , baseVName   :: !Raw.VName
     }
@@ -66,7 +65,7 @@ toKythe basevn content XRef{..} = do
             makeFileFacts basevn
                           (analysedOriginalPath xrefFile)
                           encodedContent
-        env = ConversionEnv filevn pkgvn table basevn
+        env = ConversionEnv pkgvn table basevn
         -- Files are children of the package they belong to.
         -- This makes more sense for golang, but can't hurt here either.
         pkgFileEntry = edge filevn ChildOfE pkgvn
@@ -75,6 +74,7 @@ toKythe basevn content XRef{..} = do
         stream (makeAnchor (mtSpan xrefModule) DefinesBindingE pkgvn
                            Nothing Nothing)
         mapM_ (stream . makeDeclFacts) xrefDecls
+        mapM_ (stream . makeDocDeclFacts) xrefDocDecls
         mapM_ (stream . makeUsageFacts) xrefCrossRefs
         mapM_ (stream . makeRelationFacts) xrefRelations
         mapM_ (stream . makeImportFacts) xrefImports
@@ -135,16 +135,13 @@ makeUsageFacts TickReference{..} = do
 
 -- | Makes all entries for a declaration.
 makeDeclFacts :: Decl -> Conversion [Raw.Entry]
-makeDeclFacts decl@Decl {..} = do
+makeDeclFacts decl@Decl{..} = do
     declVName <- tickVName declTick
-    -- /kythe/completes & /kythe/doc/uri facts.
-    let extraFacts = nodeFact CompleteF Definition : case tickDocUri declTick of
-          Nothing -> []
-          Just u -> [nodeFact DocUriF (T.encodeUtf8 u)]
     -- TODO(robinpalotai): use actual node type (Variable is a catch-all now).
     -- TODO(robinpalotai): emit type entries.
     -- TODO(robinpalotai): emit Module childofness if top-level.
-    let declFacts = nodeFacts declVName VariableNK extraFacts
+    let declFacts = nodeFacts declVName VariableNK
+                        [nodeFact CompleteF Definition]
     anchorEntries <- makeAnchor (declPreferredUiSpan decl)
                          DefinesBindingE declVName
                          Nothing  -- snippet
@@ -155,6 +152,15 @@ makeDeclFacts decl@Decl {..} = do
         then Just . edge declVName ChildOfE <$> asks pkgVName
         else return Nothing
     return (declFacts ++ anchorEntries ++ maybeToList childOfModule)
+
+-- | Makes all entries for a doc/uri declaration.
+makeDocDeclFacts :: DocUriDecl -> Conversion [Raw.Entry]
+makeDocDeclFacts DocUriDecl{..} = do
+    declVName <- tickVName ddeclTick
+    return $ nodeFacts declVName VariableNK
+                [ nodeFact DocUriF (T.encodeUtf8 ddeclDocUri)
+                , nodeFact CompleteF Definition
+                ]
 
 -- | Makes entries for an anchor (either explicit or implicit)..
 --

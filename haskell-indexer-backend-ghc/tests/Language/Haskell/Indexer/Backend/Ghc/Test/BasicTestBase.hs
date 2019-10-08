@@ -395,13 +395,13 @@ testImportRefsHiding =
 
 testDocUri :: AssertionInEnv
 testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
-  declWithDocUri
+  docUriDecl
     "https://hackage.haskell.org/package/ghc-prim-0.5.3/docs/src/GHC.Types.html#IO"
-    >>= singleUsage
+    >>= singleDocUriDeclUsage
     >>= includesPos (3, 6)
-  declWithDocUri
+  docUriDecl
     "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/System.IO.html#putStrLn"
-    >>= singleUsage
+    >>= singleDocUriDeclUsage
     >>= includesPos (4, 5)
 
 -- | Prepares the tests to run with the given test environment.
