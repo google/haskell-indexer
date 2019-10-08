@@ -147,7 +147,7 @@ data DocUriDecl = DocUriDecl
     { ddeclTick :: !Tick
     , ddeclDocUri :: !Text  -- ^ Document URI for the ticket.
     }
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Show)
 
 -- | Additional information about the decl, for info that is rarely present.
 data DeclExtra = DeclExtra

@@ -40,7 +40,7 @@ import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
 import qualified Data.List as L
-import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -249,25 +249,36 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
 -- field of the first 'XRef'.
 attachDocUriDecls :: [XRef] -> [XRef]
 attachDocUriDecls graph =
-    let docDecls = concatMap (generateDocUriDecls . xrefCrossRefs) graph
-        deduped = S.toList . S.fromList $ docDecls
+    let tickRefs = concatMap xrefCrossRefs graph
+        docDecls = generateDocUriDecls tickRefs
      in case graph of
             [] -> []
-            x : xs -> x {xrefDocDecls = deduped} : xs
+            x : xs -> x {xrefDocDecls = docDecls} : xs
 
 generateDocUriDecls :: [TickReference] -> [DocUriDecl]
-generateDocUriDecls refs =
-  [ DocUriDecl {ddeclTick = targetTick, ddeclDocUri = uri}
-    | r <- refs,
-      let targetTick = refTargetTick r,
-      Just uri <- [docUri targetTick]
-  ]
+generateDocUriDecls rs =
+  let declMap =
+        foldr
+          ( \r decls ->
+              let targetTick = refTargetTick r
+               in case docUri targetTick of
+                    Nothing -> decls
+                    Just uri -> addDecl uri targetTick decls
+          )
+          M.empty
+          rs
+   in M.elems declMap
   where
     docUri tick = case tickSpan tick of
       -- An empty name span probably means something from core packages.
       -- Associate with the hackage document.
       Nothing -> Just $ hackageSrcUrl tick
       Just _ -> Nothing
+    addDecl uri targetTick decls
+      | M.member uri decls = decls
+      | otherwise =
+        let decl = DocUriDecl {ddeclTick = targetTick, ddeclDocUri = uri}
+         in M.insert uri decl decls
 
 hackageSrcUrl :: Tick -> Text
 hackageSrcUrl tick =
