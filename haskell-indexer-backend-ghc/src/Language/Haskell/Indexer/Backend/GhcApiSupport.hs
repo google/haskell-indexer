@@ -239,7 +239,8 @@ postProcessDocDecls :: [XRef] -> [XRef]
 postProcessDocDecls graph =
     let docDecls = concatMap xrefDocDecls graph
         deduped = S.toList $ foldr S.insert S.empty docDecls
-     in case graph of
+        graph' = map (\x -> x {xrefDocDecls = []}) graph
+     in case graph' of
             [] -> []
             x : xs -> x {xrefDecls = xrefDecls x ++ deduped} : xs
 

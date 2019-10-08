@@ -163,15 +163,12 @@ generateDocDecls :: [TickReference] -> [Decl]
 generateDocDecls refs =
   -- Deduplicate by URI strings.
   let uriTickMap =
-        foldr
-          ( \r acc ->
-              let targetTick = refTargetTick r
-               in case tickDocUri targetTick of
-                    Nothing -> acc
-                    Just uri -> M.insert uri targetTick acc
-          )
-          M.empty
-          refs
+        M.fromList
+          [ (uri, targetTick)
+            | r <- refs,
+              let targetTick = refTargetTick r,
+              Just uri <- [tickDocUri targetTick]
+          ]
    in map
         ( \(uri, tick) ->
             -- Generate "fake" decls.
