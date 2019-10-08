@@ -39,6 +39,11 @@ library
                      , unix
                      , unordered-containers
   ghc-options:         -Wall
+                       -Werror
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010
 
 Test-Suite basic_test
@@ -66,6 +71,12 @@ Test-Suite basic_test
                , text-offset
                , transformers
                , HUnit
+  ghc-options:         -Wall
+                       -Werror
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
 
 Test-Suite typelink_test
   default-language: Haskell2010
@@ -92,3 +103,9 @@ Test-Suite typelink_test
                , text-offset
                , transformers
                , HUnit
+  ghc-options:         -Wall
+                       -Werror
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints

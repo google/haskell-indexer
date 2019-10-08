@@ -62,7 +62,7 @@ careful f x = unsafeDupablePerformIO $ do
   carefulChildren seenNodes f x
 
 -- | Returns all subelements of the same type (including self).
-carefulUniverse :: (Typeable a, Data a) => a -> [a]
+carefulUniverse :: Data a => a -> [a]
 carefulUniverse a = a:careful carefulUniverse a
 
 carefulChildren :: forall m a s. (Monoid m, Typeable a, Data s)
@@ -89,7 +89,7 @@ careful' nodesRef f node
     handlePanic e = throwGhcExceptionIO e
 
 -- | All values matching the type, deeply from the structure (including root).
-universe :: (Typeable a, Data a) => a -> [a]
+universe :: Data a => a -> [a]
 universe = carefulUniverse
 
 -- | All values of type 'a' below the root of type 's'.
@@ -98,10 +98,10 @@ universe = carefulUniverse
 -- would return only the root, while this returns everything except the root.
 -- Such usecase is not intended for universeBi anyway - use universe or
 -- children.
-universeBi :: forall s a. (Typeable a, Data a, Data s) => s -> [a]
+universeBi :: forall s a. (Data a, Data s) => s -> [a]
 universeBi = concatMap carefulUniverse . (careful return :: s -> [a])
 
 -- | Nearest descendants, excluding root.
-children :: (Typeable a, Data a) => a -> [a]
+children :: Data a => a -> [a]
 children = careful return
 

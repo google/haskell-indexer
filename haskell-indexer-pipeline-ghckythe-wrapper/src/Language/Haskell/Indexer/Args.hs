@@ -76,8 +76,8 @@ wrapperMain = do
         <> fullDesc
 
 kythePlugin :: Handle -> (AnalysisOptions -> IO XRef) -> Flags -> IO ()
-kythePlugin h action fs =
-  indexX (pluginContinuation action h)  [] fs
+kythePlugin h f flags =
+  indexX (pluginContinuation f h)  [] flags
 
 wrapperParser :: [String] -> IO Flags
 wrapperParser opts = withArgs opts (execParser (info flagParser fullDesc))

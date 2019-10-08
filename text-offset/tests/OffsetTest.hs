@@ -26,6 +26,7 @@ import Test.HUnit
 import Test.QuickCheck
 
 import Data.Char (chr)
+import Data.Maybe (fromJust)
 import Data.Text.Offset
 
 main :: IO ()
@@ -66,8 +67,8 @@ propBytecountMatchesFinalOffset mss =
         tlines = TL.splitOn "\n" t
         queryLine = length tlines - 1
         queryCol = (fromIntegral . TL.length . last $ tlines) - 1
-        Just afterLastByteOffset =
-            (+1) `fmap` lineColToByteOffset table queryLine queryCol
+        afterLastByteOffset =
+            fromJust $ (+1) `fmap` lineColToByteOffset table queryLine queryCol
         encodedLength = fromIntegral . BL.length . TL.encodeUtf8 $ t
         tl = fromIntegral . TL.length $ t
     in classify (length tlines == 1) "single-line" $

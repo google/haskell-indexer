@@ -45,7 +45,6 @@ import System.IO.Temp (withTempDirectory)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Language.Haskell.Indexer.Backend.GhcArgs
-import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcApiSupport (withTypechecked)
 import Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert  -- to reexport

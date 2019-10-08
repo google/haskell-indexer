@@ -28,6 +28,12 @@ library
                      , proto-lens >= 0.5 && < 0.6
                      , text
   exposed-modules:  Language.Haskell.Indexer.Args
+  ghc-options:         -Wall
+                       -Werror
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language: Haskell2010
 
 
@@ -35,4 +41,10 @@ executable "ghc_kythe_wrapper"
   hs-source-dirs:      main
   main-is:             GhcKytheWrapper.hs
   build-depends:       base >= 4.8 && < 5, haskell-indexer-pipeline-ghckythe-wrapper
+  ghc-options:         -Wall
+                       -Werror
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010
