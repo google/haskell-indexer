@@ -225,9 +225,26 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
                                 . hsGroupInstDecls
                                 $ hsGroup
         explicitVarBindDefs = map mkDeclName explicitNames
-        varBindDefs = explicitVarBindDefs ++ implicitVarBindDefs
-    in (concat [defs, instDefs, varBindDefs], instChanges)
+        variableBindDefs = explicitVarBindDefs ++ implicitVarBindDefs
+        valueBindDefs = case hs_valds hsGroup of
+            x@ValBinds {} ->
+                error $
+                  "should not hit ValBinds when accessing renamed AST: "
+                    ++ showOutputable ctx x
+            -- TODO(jinwoo): Collect for signatures too.
+            XValBindsLR (NValBinds binds _) ->
+                collectPatSymDefs . map snd $ binds
+    in (concat [defs, instDefs, variableBindDefs, valueBindDefs], instChanges)
   where
+    collectPatSymDefs :: [LHsBinds GhcRn] -> [DeclAndAlt]
+    collectPatSymDefs binds = concatMap collectPatBinds binds
+    collectPatBinds :: LHsBinds GhcRn -> [DeclAndAlt]
+    collectPatBinds bindsBag =
+      mapMaybe collect (GHC.bagToList bindsBag)
+      where
+        collect (L _ (PatSynBind _ PSB {psb_id = psbId})) =
+          Just $ declWithWrappedIdLoc (outputableStringyType ctx psbId) psbId
+        collect _ = Nothing
     keepFirst [] = Nothing
     keepFirst xs@((name, _):_) = Just $! (name, minimum $ map snd xs)
     mkDeclName n = nameDeclAlt ctx n Nothing typeStringyType
@@ -432,8 +449,10 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
         sigRefs = case hs_valds hsGroup of
-            ValBinds _ _ _ ->
-                error "should not hit ValBinds when accessing renamed AST"
+            x@ValBinds {} ->
+                error $
+                  "should not hit ValBinds when accessing renamed AST: "
+                    ++ showOutputable ctx x
             XValBindsLR (NValBinds _ lsigs) -> concatMap refsFromSignature lsigs
         importRefs = concatMap refsFromImportDecl importDecls
         exportRefs = refsFromExports exports
@@ -675,14 +694,17 @@ declsFromHsBinds ctx = dedupByTick . concatMap go
     --
     absFunDeclsFromHsBind :: LHsBind GhcTc -> [DeclAndAlt]
     absFunDeclsFromHsBind (L _ b) = case b of
-        FunBind _ (L idLoc funVar) _ _ _ ->
+        FunBind _ (L idLoc funVar) _ _ _
+          | isPatternSynonymSpecialVar funVar -> []
+          | otherwise ->
             let decl = setIdSpan (give ctx $ srcSpanToSpan idLoc)
                                  (varDecl ctx funVar)
             in [DeclAndAlt decl Nothing]
         AbsBinds {abs_exports = exports } ->
             let abeVar = uncurry (varDeclAlt ctx)
-            in map abeVar . filter (not . isInstanceMethodVar . fst)
-                  $ absExportsToIds exports
+                isValid x = not $
+                    isInstanceMethodVar x || isPatternSynonymSpecialVar x
+            in map abeVar . filter (isValid . fst) $ absExportsToIds exports
         _ ->
             -- TODO(robinpalotai): anything to do here?
             []
@@ -700,17 +722,31 @@ declsFromHsBinds ctx = dedupByTick . concatMap go
 isInstanceMethodVar :: Var -> Bool
 isInstanceMethodVar v = specialVar v == Just TypeclassySV
 
+-- | These are special bindings related to pattern synonyms which are not
+-- needed for us and contain overlapping declarations.
+-- See https://github.com/google/haskell-indexer/issues/75
+isPatternSynonymSpecialVar :: Var -> Bool
+isPatternSynonymSpecialVar v = specialVar v == Just PatternSynonymSV
+
 specialVar :: Var -> Maybe SpecialVar
 specialVar v = case take 2 (nameOccurenceString (varName v)) of
+    -- See the "Making system names" document and functions like
+    -- mkDataConWrapperOcc, mkWorkerOcc, etc. in
+    -- https://hackage.haskell.org/package/ghc-8.6.5/docs/src/OccName.html for
+    -- the details.
+    --
     -- List appended as cases are encountered.
     "$d" -> Just $! TypeclassySV
     "$f" -> Just $! TypeclassySV
     "$c" -> Just $! TypeclassySV
+    "$m" -> Just $! PatternSynonymSV -- for uni/bi-directional pattern synonyms
+    "$b" -> Just $! PatternSynonymSV -- for bi-directional pattern synonyms
     "$W" -> DataConWorkerWrapperSV <$> GHC.isDataConId_maybe v
     _ -> Nothing
 
 data SpecialVar
     = TypeclassySV
+    | PatternSynonymSV
     | DataConWorkerWrapperSV DataCon
     deriving (Eq)
 

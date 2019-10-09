@@ -47,7 +47,7 @@ testRecursiveRef = assertXRefsFrom ["basic/RecursiveRef.hs"] $ do
         [u1, u2] -> do
             includesPos (6,9) u1
             includesPos (8,23) u2
-        _ -> checking $ assertFailure "Usage count differs"
+        us -> checking $ assertFailure $ "Usage count differs: " ++ show us
     -- Recursive fun with type signature should target using the
     -- polymorphic binding.
     declAt (11,1) >>= usages >>= \case
@@ -100,7 +100,7 @@ testFunCall = assertXRefsFrom ["basic/FunCall.hs"] $ do
                 [ includesPos (10,12)
                 , refKindIs Ref
                 ]
-        _ -> checking $ assertFailure "Usage count differs"
+        us -> checking $ assertFailure $ "Usage count differs: " ++ show us
 
 -- | Tests that typeclass method usages are extracted.
 -- Also includes test for types, as typeclass/instance types are trickier to
@@ -159,11 +159,12 @@ testTemplateHaskellQuotation = assertXRefsFrom
       ["basic/TemplateHaskellQuotation.hs"] $
     -- Location for TH-generated decls is just the whole span of the runQ
     -- block - can live with that.
-    declsAt (6,3) >>= \case
+    declsAt (6, 3) >>= \case
         [f, v] -> do
             singleUsage f >>= includesPos (11,11)
             singleUsage v >>= includesPos (11,17)
-        _ -> checking $ assertFailure "Expected two decls from TH."
+        decls -> checking $
+            assertFailure $ "Expected two decls from TH, but got " ++ show decls
 
 testTemplateHaskellCodeExec :: AssertionInEnv
 testTemplateHaskellCodeExec = assertXRefsFrom
@@ -228,7 +229,8 @@ testRecordRead = assertXRefsFrom ["basic/RecordRead.hs"] $ do
         u1:u2:_ -> do
             includesPos (6,9) u1
             includesPos (10,10) u2
-        _ -> checking $ assertFailure "Different use count for ctor read."
+        us -> checking $
+            assertFailure $ "Different use count for ctor read: " ++ show us
     declAt (4,18) >>= usages >>= \case
         [u1, u2, u3, u4, u5, u6, u7, u8] -> do
             -- Simple accessor.
@@ -348,7 +350,8 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         assertRefKind Import u1
         includesPos (4, 5) u2 -- export list in ImpExpDefs.hs
         includesPos (8, 1) u3 -- type signature in ImpExpDefs.hs
-      _ -> checking $ assertFailure "Usage count differs for foo"
+      us -> checking $
+        assertFailure $ "Usage count differs for foo: " ++ show us
     -- bar
     declAt (12, 1) >>= usages >>= \case
       [u1, u2, u3] -> do
@@ -356,7 +359,8 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         includesPos (3, 20) u2 -- import statement in ImportRefs.hs
         assertRefKind Import u2
         includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
-      _ -> checking $ assertFailure "Usage count differs for bar"
+      us -> checking $
+        assertFailure $ "Usage count differs for bar: " ++ show us
     -- FooBar
     declAt (14, 6) >>= usages >>= \case
       [u1, u2, u3, u4] -> do
@@ -364,25 +368,29 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         includesPos (4, 20) u2
         includesPos (5, 20) u3
         includesPos (6, 20) u4
-      _ -> checking $ assertFailure "Usage count differs for FooBar"
+      us -> checking $
+        assertFailure $ "Usage count differs for FooBar: " ++ show us
     -- MkFooBar
     declAt (15, 5) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 13) u1 -- export list in ImpExpDefs.h
         includesPos (6, 28) u2
-      _ -> checking $ assertFailure "Usage count differs for MkFooBar"
+      us -> checking $
+        assertFailure $ "Usage count differs for MkFooBar: " ++ show us
     -- fbFoo
     declAt (16, 9) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 23) u1 -- export list in ImpExpDefs.h
         includesPos (6, 38) u2
-      _ -> checking $ assertFailure "Usage count differs for fbFoo"
+      us -> checking $
+        assertFailure $ "Usage count differs for fbFoo: " ++ show us
     -- fbBar
     declAt (17, 9) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 30) u1 -- export list in ImpExpDefs.h
         includesPos (6, 45) u2
-      _ -> checking $ assertFailure "Usage count differs for fbBar"
+      us -> checking $
+        assertFailure $ "Usage count differs for fbBar: " ++ show us
 
 testImportRefsHiding :: AssertionInEnv
 testImportRefsHiding =
@@ -394,7 +402,8 @@ testImportRefsHiding =
           includesPos (3, 27) u2 -- import statement in ImportRefsHiding.hs
           assertRefKind Ref u2
           includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
-        _ -> checking $ assertFailure "Usage count differs for bar"
+        us -> checking $
+          assertFailure $ "Usage count differs for bar: " ++ show us
 
 testDocUri :: AssertionInEnv
 testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
@@ -406,6 +415,16 @@ testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
     "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/System.IO.html#putStrLn"
     >>= singleDocUriDeclUsage
     >>= includesPos (4, 5)
+
+testPatternSynonyms :: AssertionInEnv
+testPatternSynonyms = assertXRefsFrom ["basic/PatSyn.hs"] $ do
+    declAt (4, 9) >>= singleUsage >>= includesPos (6, 15)
+    declAt (8, 9) >>= usages >>= \case
+      [u1, u2] -> do
+        includesPos (10, 14) u1
+        includesPos (12, 14) u2
+      us -> checking $
+        assertFailure $ "Usage count differs for BiSingle: " ++ show us
 
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
@@ -435,6 +454,7 @@ allTests env =
     , envTestCase "import-export-refs" testImpExpRefs
     , envTestCase "import-refs-hiding" testImportRefsHiding
     , envTestCase "doc-uri" testDocUri
+    , envTestCase "pattern-synonyms" testPatternSynonyms
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

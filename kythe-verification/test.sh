@@ -49,6 +49,7 @@ for fut in \
     "$BASIC/ImpExpDefs.hs $BASIC/ImportRefs.hs" \
     "$BASIC/LocalRef.hs" \
     "$BASIC/Module.hs" \
+    "$BASIC/PatSyn.hs" \
     "$BASIC/RecordReadRef.hs" \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
