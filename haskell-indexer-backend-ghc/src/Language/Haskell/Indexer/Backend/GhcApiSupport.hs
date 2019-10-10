@@ -13,6 +13,7 @@
 -- limitations under the License.
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 -- | Deals with the gory details of starting up GHC and analysing a set of
@@ -38,14 +39,25 @@ import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
+import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.List as L
+import Data.Maybe (isNothing)
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import GHC.Paths (libdir)
+import Network.URI (escapeURIString, isUnescapedInURIComponent)
 import System.FilePath ((</>))
 import System.Posix.Signals (installHandler, sigINT, Handler(Default))
 import System.IO (hPutStrLn, stderr)
 
-import Language.Haskell.Indexer.Translate (XRef(..))
+import Language.Haskell.Indexer.Translate
+    ( DocUriDecl(..)
+    , PkgModule(..)
+    , Tick(..)
+    , TickReference(..)
+    , XRef(..)
+    )
 import Language.Haskell.Indexer.Backend.GhcArgs
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
 import Language.Haskell.Indexer.Backend.Ghc (analyseTypechecked)
@@ -104,7 +116,8 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
                 printErr $ "Flag errors: "
                               ++ L.intercalate ", " (map getWarnMsg errors)
             return (unused, defaultTargetAndLink)
-        ghcDflagOp (\d -> printErr $ show ("Codegen state after flag parse",
+        ghcDflagOp (\d -> printErr
+                      $ show ("Codegen state after flag parse" :: String,
                               hscTarget d, ghcLink d))
         -- After dynamic flag parsing, what remains: Haskell and non-Haskell
         -- sources, object files/shared libs, RTS options. Also --make and such,
@@ -175,8 +188,9 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
                     d { ldInputs = map (FileOption "") o_files ++ ldInputs d }
             magicLink
         -- Proceed with compiling Haskell.
-        ghcDflagOp $ \d -> printErr $ show ("Codegen state after setting up TH",
-                               hscTarget d, ghcLink d)
+        ghcDflagOp $ \d -> printErr
+                        $ show ("Codegen state after setting up TH" :: String,
+                                hscTarget d, ghcLink d)
         graph <- depanal [] False  -- DynFlags may have changed, so call again.
         ghcDflagOp $ \d -> printErr $ "Loading Haskell targets:"
                                ++ L.intercalate "," (map (showPpr d) hsTargets)
@@ -188,7 +202,8 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             extractXref = analyseTypechecked env analysisOpts
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
-    mapM_ xrefSink xrefGraph
+    let xrefGraph' = attachDocUriDecls xrefGraph
+    mapM_ xrefSink xrefGraph'
  where
     getWarnMsg :: Warn -> String
     getWarnMsg = unLoc . warnMsg
@@ -228,6 +243,54 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             -- TODO(robinpalotai): link packages? See 'reallyInitDynLinker'.
             -- This might be needed if TH executes code from other package? Or
             -- only if that code needs FFI?
+
+-- | Doc URI decls are for things that don't have source code available; most
+-- likely those from core packages. Hence their decls may be duplicated coming
+-- from multiple analyses. Deduplicate them, and put them in the 'xrefDocDecls'
+-- field of the first 'XRef'.
+attachDocUriDecls :: [XRef] -> [XRef]
+attachDocUriDecls graph =
+    let tickRefs = concatMap xrefCrossRefs graph
+        docDecls = generateDocUriDecls tickRefs
+     in case graph of
+            [] -> []
+            x : xs -> x {xrefDocDecls = docDecls} : xs
+
+data Deduping = Deduping { dedupTick :: Tick, dedupKey :: (PkgModule, Text) }
+
+generateDocUriDecls :: [TickReference] -> [DocUriDecl]
+generateDocUriDecls refs =
+  map (\t -> DocUriDecl {ddeclTick = t, ddeclDocUri = hackageSrcUrl t})
+    dedupedPotentialDocUriTargetTicks
+  where
+    dedupedPotentialDocUriTargetTicks =
+      map dedupTick
+        . nubOrdOn dedupKey
+        . map (\t -> Deduping t (tickPkgModule t, tickThing t))
+        . filter (\t -> tickUniqueInModule t && needsDocUri t)
+        . map refTargetTick
+        $ refs
+    -- An empty name span probably means something from core packages.
+    -- Associate with the hackage document.
+    needsDocUri = isNothing . tickSpan
+
+hackageSrcUrl :: Tick -> Text
+hackageSrcUrl tick =
+  let pm = tickPkgModule tick
+      pkg = getPackageWithVersion pm
+      modName = getModule pm
+      name = tickThing tick
+   in T.concat
+        [ "https://hackage.haskell.org/package/"
+        , escape pkg
+        , "/docs/src/"
+        , escape modName
+        , ".html#"
+        , escape name
+        ]
+  where
+    escape :: Text -> Text
+    escape = T.pack . escapeURIString isUnescapedInURIComponent . T.unpack
 
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary

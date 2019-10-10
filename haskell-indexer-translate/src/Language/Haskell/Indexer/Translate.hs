@@ -33,6 +33,7 @@ module Language.Haskell.Indexer.Translate
     , ModuleTick(..)
     , Decl(..)
     , DeclExtra(..), emptyExtra, withExtra
+    , DocUriDecl(..)
     , PkgModule(..)
     , StringyType(..)
     , TickReference(..), ReferenceKind(..)
@@ -72,6 +73,7 @@ data XRef = XRef
     { xrefFile      :: !AnalysedFile
     , xrefModule    :: !ModuleTick
     , xrefDecls     :: [Decl]
+    , xrefDocDecls  :: [DocUriDecl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     , xrefImports :: [ModuleTick]
@@ -104,7 +106,7 @@ data ModuleTick = ModuleTick
 --
 -- Not related to GHC's SCC annotations (called ticks internally).
 data Tick = Tick
-    { tickSourcePath :: !SourcePath
+    { tickSourcePath :: !(Maybe SourcePath)
     , tickPkgModule  :: !PkgModule
     , tickThing      :: !Text
       -- ^ The unqualified name of the entity.
@@ -124,6 +126,7 @@ data Tick = Tick
 data PkgModule = PkgModule
     { getPackage :: !Text
     , getModule :: !Text
+    , getPackageWithVersion :: !Text
     }
     deriving (Eq, Ord, Show)
 
@@ -137,6 +140,12 @@ data Decl = Decl
     , declExtra :: !(Maybe DeclExtra)
       -- ^ Since rarely present, in 'Maybe' to minimize memory usage, and to
       --   let DeclExtra grow without concern.
+    }
+    deriving (Eq, Show)
+
+data DocUriDecl = DocUriDecl
+    { ddeclTick :: !Tick
+    , ddeclDocUri :: !Text  -- ^ Document URI for the ticket.
     }
     deriving (Eq, Show)
 
