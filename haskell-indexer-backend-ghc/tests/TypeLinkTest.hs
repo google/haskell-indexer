@@ -12,7 +12,10 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+module Main (main) where
+
 import Language.Haskell.Indexer.Backend.Ghc.Test.TestShim (runTests)
 import Language.Haskell.Indexer.Backend.Ghc.Test.TypeLinkTestBase (allTests)
 
+main :: IO ()
 main = runTests allTests

@@ -149,15 +149,15 @@ prettyReference ref = "TickReference {"
 importAt :: (Int,Int) -> Text -> ReaderT XRef IO ()
 importAt pos importName = do
     imports <- asks xrefImports
-    let filtered = filter (equalsImport pos importName) imports
+    let filtered = filter equalsImport imports
     case filtered of
         [] -> failConcat ["No import ", T.unpack importName, " at pos ", show pos]
-        [im] -> return ()
+        [_im] -> return ()
         ims -> failConcat
             ["Multiple imports at pos ", show pos, ":\n", show ims]
     where
-      equalsImport :: (Int,Int) -> Text -> ModuleTick -> Bool
-      equalsImport pos importName imp =
+      equalsImport :: ModuleTick -> Bool
+      equalsImport imp =
           containsPos pos imp && importName == (getModule . mtPkgModule $ imp)
 
 containsPos :: (Spanny a) => (Int,Int) -> a -> Bool
@@ -277,7 +277,7 @@ checking :: (Monad m) => m () -> ReaderT XRef m ()
 checking = lift
 
 -- | Performs all assertions on the same subject.
-assertAll :: (Applicative m, Monad m) => [a -> m ()] -> a -> m ()
+assertAll :: (Monad m) => [a -> m ()] -> a -> m ()
 assertAll = runReaderT . sequenceA_ . map ReaderT
 
 -- | Combinator with no better name?

@@ -19,6 +19,11 @@ library
   build-depends:       base >=4.7 && <5
                      , text
                      , vector
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010
 
 Test-Suite offset_test
@@ -35,4 +40,8 @@ Test-Suite offset_test
                , text-offset
                , HUnit
                , QuickCheck
-
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints

@@ -2526,4 +2526,9 @@ library
                        zm ==0.2.4,
                        zot ==0.0.3,
                        ztail ==1.2
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010

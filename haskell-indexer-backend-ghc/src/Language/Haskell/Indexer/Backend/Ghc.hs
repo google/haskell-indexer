@@ -68,7 +68,6 @@ import Data.Reflection (Given, give, given)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable (Typeable)
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -633,7 +632,7 @@ data ParentChild a = ParentChild
 
 -- | Like 'universe', but serves the elements along with their nearest ancestor
 -- of the same type. The top element will be returned too, but without a parent.
-universeWithParents :: (Data a, Typeable a) => a -> [ParentChild a]
+universeWithParents :: Data a => a -> [ParentChild a]
 universeWithParents a = ParentChild Nothing a : go a
   where
     go x = let cs = children x

@@ -17,4 +17,9 @@ library
   exposed-modules:     Language.Haskell.Indexer.Backend.AnalysisOptions
   build-depends:       base >=4.8 && <5
                      , text
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010

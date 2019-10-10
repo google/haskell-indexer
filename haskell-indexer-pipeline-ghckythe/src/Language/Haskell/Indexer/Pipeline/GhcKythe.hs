@@ -22,7 +22,7 @@ module Language.Haskell.Indexer.Pipeline.GhcKythe
 
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Identity (runIdentity)
-import Control.Monad.Morph (lift, hoist)
+import Control.Monad.Morph (lift)
 import qualified Data.ByteString as B
 import Data.Conduit
     ( (.|)

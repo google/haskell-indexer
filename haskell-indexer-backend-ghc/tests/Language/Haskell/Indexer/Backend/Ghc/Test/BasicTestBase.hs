@@ -348,7 +348,7 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         assertRefKind Import u1
         includesPos (4, 5) u2 -- export list in ImpExpDefs.hs
         includesPos (8, 1) u3 -- type signature in ImpExpDefs.hs
-      us -> checking $ assertFailure "Usage count differs for foo"
+      _ -> checking $ assertFailure "Usage count differs for foo"
     -- bar
     declAt (12, 1) >>= usages >>= \case
       [u1, u2, u3] -> do
@@ -356,7 +356,7 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         includesPos (3, 20) u2 -- import statement in ImportRefs.hs
         assertRefKind Import u2
         includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
-      us -> checking $ assertFailure "Usage count differs for bar"
+      _ -> checking $ assertFailure "Usage count differs for bar"
     -- FooBar
     declAt (14, 6) >>= usages >>= \case
       [u1, u2, u3, u4] -> do
@@ -364,22 +364,25 @@ testImpExpRefs = assertXRefsFrom ["basic/ImpExpDefs.hs", "basic/ImportRefs.hs"]
         includesPos (4, 20) u2
         includesPos (5, 20) u3
         includesPos (6, 20) u4
-      us -> checking $ assertFailure "Usage count differs for FooBar"
+      _ -> checking $ assertFailure "Usage count differs for FooBar"
     -- MkFooBar
     declAt (15, 5) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 13) u1 -- export list in ImpExpDefs.h
         includesPos (6, 28) u2
+      _ -> checking $ assertFailure "Usage count differs for MkFooBar"
     -- fbFoo
     declAt (16, 9) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 23) u1 -- export list in ImpExpDefs.h
         includesPos (6, 38) u2
+      _ -> checking $ assertFailure "Usage count differs for fbFoo"
     -- fbBar
     declAt (17, 9) >>= usages >>= \case
       [u1, u2] -> do
         includesPos (2, 30) u1 -- export list in ImpExpDefs.h
         includesPos (6, 45) u2
+      _ -> checking $ assertFailure "Usage count differs for fbBar"
 
 testImportRefsHiding :: AssertionInEnv
 testImportRefsHiding =
@@ -391,7 +394,7 @@ testImportRefsHiding =
           includesPos (3, 27) u2 -- import statement in ImportRefsHiding.hs
           assertRefKind Ref u2
           includesPos (11, 1) u3 -- type signature in ImpExpDefs.hs
-        us -> checking $ assertFailure "Usage count differs for bar"
+        _ -> checking $ assertFailure "Usage count differs for bar"
 
 testDocUri :: AssertionInEnv
 testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do

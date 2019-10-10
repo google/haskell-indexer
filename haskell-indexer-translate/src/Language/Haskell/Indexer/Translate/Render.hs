@@ -60,4 +60,5 @@ declPreferredUiSpan :: Decl -> Maybe Span
 declPreferredUiSpan decl =
     (declExtra decl >>= alternateIdSpan) <|> declIdentifierSpan decl
 
+pmText :: PkgModule -> Text
 pmText pm = getPackage pm <> ":" <> getModule pm

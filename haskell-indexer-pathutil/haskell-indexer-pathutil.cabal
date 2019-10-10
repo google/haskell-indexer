@@ -18,4 +18,9 @@ library
   build-depends:       base >=4.8 && <5
                      , filepath
                      , text
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wredundant-constraints
   default-language:    Haskell2010

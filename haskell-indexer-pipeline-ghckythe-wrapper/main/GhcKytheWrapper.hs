@@ -30,5 +30,5 @@ module Main where
 
 import Language.Haskell.Indexer.Args (wrapperMain)
 
+main :: IO ()
 main = wrapperMain
-
