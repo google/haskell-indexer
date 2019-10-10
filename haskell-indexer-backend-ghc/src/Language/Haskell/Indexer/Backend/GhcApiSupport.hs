@@ -39,8 +39,9 @@ import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
+import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.List as L
-import qualified Data.Map as M
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -255,30 +256,23 @@ attachDocUriDecls graph =
             [] -> []
             x : xs -> x {xrefDocDecls = docDecls} : xs
 
+data Deduping = Deduping { dedupTick :: Tick, dedupKey :: (PkgModule, Text) }
+
 generateDocUriDecls :: [TickReference] -> [DocUriDecl]
-generateDocUriDecls rs =
-  let declMap =
-        foldr
-          ( \r decls ->
-              let targetTick = refTargetTick r
-               in case docUri targetTick of
-                    Nothing -> decls
-                    Just uri -> addDecl uri targetTick decls
-          )
-          M.empty
-          rs
-   in M.elems declMap
+generateDocUriDecls refs =
+  map (\t -> DocUriDecl {ddeclTick = t, ddeclDocUri = hackageSrcUrl t})
+    dedupedPotentialDocUriTargetTicks
   where
-    docUri tick = case tickSpan tick of
-      -- An empty name span probably means something from core packages.
-      -- Associate with the hackage document.
-      Nothing -> Just $ hackageSrcUrl tick
-      Just _ -> Nothing
-    addDecl uri targetTick decls
-      | M.member uri decls = decls
-      | otherwise =
-        let decl = DocUriDecl {ddeclTick = targetTick, ddeclDocUri = uri}
-         in M.insert uri decl decls
+    dedupedPotentialDocUriTargetTicks =
+      map dedupTick
+        . nubOrdOn dedupKey
+        . map (\t -> Deduping t (tickPkgModule t, tickThing t))
+        . filter (\t -> tickUniqueInModule t && needsDocUri t)
+        . map refTargetTick
+        $ refs
+    -- An empty name span probably means something from core packages.
+    -- Associate with the hackage document.
+    needsDocUri = isNothing . tickSpan
 
 hackageSrcUrl :: Tick -> Text
 hackageSrcUrl tick =
