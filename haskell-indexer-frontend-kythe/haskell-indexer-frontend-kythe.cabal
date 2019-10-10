@@ -26,7 +26,6 @@ library
                      , text-offset >= 0.1
                      , transformers
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

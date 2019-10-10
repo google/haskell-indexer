@@ -39,7 +39,6 @@ library
                      , unix
                      , unordered-containers
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns
@@ -72,7 +71,6 @@ Test-Suite basic_test
                , transformers
                , HUnit
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns
@@ -104,7 +102,6 @@ Test-Suite typelink_test
                , transformers
                , HUnit
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

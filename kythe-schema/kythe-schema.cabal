@@ -26,7 +26,6 @@ library
                      , proto-lens >= 0.5 && < 0.6
                      , text
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

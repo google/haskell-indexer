@@ -2527,7 +2527,6 @@ library
                        zot ==0.0.3,
                        ztail ==1.2
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

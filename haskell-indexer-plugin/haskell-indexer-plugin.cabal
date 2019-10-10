@@ -27,7 +27,6 @@ library
                        , filepath, directory
   hs-source-dirs:      src
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

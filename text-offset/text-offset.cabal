@@ -20,7 +20,6 @@ library
                      , text
                      , vector
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns
@@ -42,7 +41,6 @@ Test-Suite offset_test
                , HUnit
                , QuickCheck
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns

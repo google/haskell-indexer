@@ -29,7 +29,6 @@ library
                      , text
   exposed-modules:  Language.Haskell.Indexer.Args
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns
@@ -42,7 +41,6 @@ executable "ghc_kythe_wrapper"
   main-is:             GhcKytheWrapper.hs
   build-depends:       base >= 4.8 && < 5, haskell-indexer-pipeline-ghckythe-wrapper
   ghc-options:         -Wall
-                       -Werror
                        -Wcompat
                        -Wincomplete-record-updates
                        -Wincomplete-uni-patterns
