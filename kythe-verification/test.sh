@@ -54,10 +54,11 @@ for fut in \
     "$BASIC/RecordWriteRef.hs" \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
-    "$BASIC/TypeDef.hs"
+    "$BASIC/TypeDef.hs" \
+    "$BASIC/TypeVarInSig.hs"
 do
   echo "Verifying: $fut"
-  $GHC_KYTHE -- $fut 2> /dev/null | $VERIFIER -goal_prefix '-- -' --check_for_singletons=true $fut \
+  $GHC_KYTHE -- $fut 2> /dev/null | $VERIFIER -goal_prefix '-- -' --check_for_singletons=true --ignore_dups $fut \
     || die
 done
 
