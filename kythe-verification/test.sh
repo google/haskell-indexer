@@ -55,6 +55,7 @@ for fut in \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
     "$BASIC/TypeDef.hs" \
+    "$BASIC/TypeOperators.hs" \
     "$BASIC/TypeVarInSig.hs"
 do
   echo "Verifying: $fut"
