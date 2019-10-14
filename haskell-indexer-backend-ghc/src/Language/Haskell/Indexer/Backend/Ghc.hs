@@ -12,7 +12,6 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -86,9 +85,6 @@ import Language.Haskell.Indexer.Translate
 
   * Documentation nodes.
     - Attached to the decls.
-
-  * Import/Exports.
-    - Spans where things are exported/imported from/to the module.
 -}
 
 -- | Data commonly accessed during analysis.
