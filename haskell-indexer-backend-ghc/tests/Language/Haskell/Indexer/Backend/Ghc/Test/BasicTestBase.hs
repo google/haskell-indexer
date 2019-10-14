@@ -426,6 +426,10 @@ testPatternSynonyms = assertXRefsFrom ["basic/PatSyn.hs"] $ do
       us -> checking $
         assertFailure $ "Usage count differs for BiSingle: " ++ show us
 
+testTypeOperators :: AssertionInEnv
+testTypeOperators = assertXRefsFrom ["basic/TypeOperators.hs"] $ do
+    declAt (5, 8) >>= singleUsage >>= includesPos (7, 22)
+
 -- | Prepares the tests to run with the given test environment.
 allTests :: TestEnv -> [Test]
 allTests env =
@@ -455,6 +459,7 @@ allTests env =
     , envTestCase "import-refs-hiding" testImportRefsHiding
     , envTestCase "doc-uri" testDocUri
     , envTestCase "pattern-synonyms" testPatternSynonyms
+    , envTestCase "type-operators" testTypeOperators
     ]
   where
     envTestCase name test = testCase name (runReaderT test env)

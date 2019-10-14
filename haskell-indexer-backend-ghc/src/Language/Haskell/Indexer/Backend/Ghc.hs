@@ -472,8 +472,17 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
     refsFromSignature :: LSig GhcRn -> [Reference]
     refsFromSignature (L _ sig) = case sig of
         TypeSig _ names _ ->
-            mapMaybe (\(L l n) -> give ctx (nameLocToRef n TypeDecl l)) names
+            let fromNames =
+                    mapMaybe
+                        (\(L l n) -> give ctx (nameLocToRef n TypeDecl l))
+                        names
+                typeOpRefs = mapMaybe refsFromTypeOperator (universeBi sig)
+             in typeOpRefs ++ fromNames
         _ -> []
+      where
+        refsFromTypeOperator :: HsType GhcRn -> Maybe Reference
+        refsFromTypeOperator (HsOpTy _ _ (L l n) _) = give ctx (nameLocToRef n Ref l)
+        refsFromTypeOperator _ = Nothing
 
     refsFromExports :: Maybe [(LIE GhcRn, Avails)] -> [Reference]
     refsFromExports Nothing = []
