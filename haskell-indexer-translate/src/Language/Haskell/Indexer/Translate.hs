@@ -34,6 +34,7 @@ module Language.Haskell.Indexer.Translate
     , Decl(..)
     , DeclExtra(..), emptyExtra, withExtra
     , DocUriDecl(..)
+    , ModuleDocUriDecl(..)
     , PkgModule(..)
     , StringyType(..)
     , TickReference(..), ReferenceKind(..)
@@ -74,6 +75,7 @@ data XRef = XRef
     , xrefModule    :: !ModuleTick
     , xrefDecls     :: [Decl]
     , xrefDocDecls  :: [DocUriDecl]
+    , xrefModuleDocDecls  :: [ModuleDocUriDecl]
     , xrefCrossRefs :: [TickReference]
     , xrefRelations :: [Relation]
     , xrefImports :: [ModuleTick]
@@ -146,6 +148,12 @@ data Decl = Decl
 data DocUriDecl = DocUriDecl
     { ddeclTick :: !Tick
     , ddeclDocUri :: !Text  -- ^ Document URI for the ticket.
+    }
+    deriving (Eq, Show)
+
+data ModuleDocUriDecl = ModuleDocUriDecl
+    { mddeclPkgModule :: !PkgModule
+    , mddeclDocUri :: !Text  -- ^ Document URI for the module.
     }
     deriving (Eq, Show)
 

@@ -40,7 +40,7 @@ import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
 import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.List as L
-import Data.Maybe (catMaybes, isNothing)
+import Data.Maybe (catMaybes, isNothing, mapMaybe)
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -63,6 +63,8 @@ import System.IO (hPutStrLn, stderr)
 
 import Language.Haskell.Indexer.Translate
     ( DocUriDecl(..)
+    , ModuleDocUriDecl(..)
+    , ModuleTick(..)
     , PkgModule(..)
     , Tick(..)
     , TickReference(..)
@@ -264,9 +266,17 @@ attachDocUriDecls :: Set Text -> [XRef] -> [XRef]
 attachDocUriDecls globalPkgs graph =
     let tickRefs = concatMap xrefCrossRefs graph
         docDecls = generateDocUriDecls globalPkgs tickRefs
+        indexedModules = S.fromList . map (mtPkgModule . xrefModule) $ graph
+        imports = concatMap xrefImports graph
+        moduleDocDecls =
+            generateModuleDocUriDecls globalPkgs indexedModules imports
      in case graph of
             [] -> []
-            x : xs -> x {xrefDocDecls = docDecls} : xs
+            x : xs ->
+                x { xrefDocDecls = docDecls
+                  , xrefModuleDocDecls = moduleDocDecls
+                  }
+                : xs
 
 data Deduping = Deduping { dedupTick :: Tick, dedupKey :: (PkgModule, Text) }
 
@@ -287,23 +297,44 @@ generateDocUriDecls globalPkgs refs =
     needsDocUri t = (isNothing . tickSpan) t && isFromCorePackage t
     isFromCorePackage t = (getPackage . tickPkgModule) t `S.member` globalPkgs
 
+-- | Generates doc/uri information for imported modules that are from core
+-- packages. Because those modules are not indexed, add Hackage document URLs
+-- instead.
+generateModuleDocUriDecls ::
+  Set Text -> Set PkgModule -> [ModuleTick] -> [ModuleDocUriDecl]
+generateModuleDocUriDecls globalPkgs indexedModules imports =
+  let pms = L.nub $ map mtPkgModule imports
+   in mapMaybe generate pms
+  where
+    generate :: PkgModule -> Maybe ModuleDocUriDecl
+    generate pm =
+      if needsDocUri pm
+        then Just $ ModuleDocUriDecl pm (hackageSrcUrlForModule pm)
+        else Nothing
+    needsDocUri pm = not (pm `S.member` indexedModules) && isFromCorePackage pm
+    isFromCorePackage pm = getPackage pm `S.member` globalPkgs
+
 hackageSrcUrl :: Tick -> Text
 hackageSrcUrl tick =
-  let pm = tickPkgModule tick
-      pkg = getPackageWithVersion pm
+  let moduleUrl = hackageSrcUrlForModule $ tickPkgModule tick
+      frag = escapeUriComponent $ tickThing tick
+   in T.concat [moduleUrl, "#", frag]
+
+hackageSrcUrlForModule :: PkgModule -> Text
+hackageSrcUrlForModule pm =
+  let pkg = getPackageWithVersion pm
       modName = getModule pm
-      name = tickThing tick
    in T.concat
-        [ "https://hackage.haskell.org/package/"
-        , escape pkg
-        , "/docs/src/"
-        , escape modName
-        , ".html#"
-        , escape name
+        [ "https://hackage.haskell.org/package/",
+          escapeUriComponent pkg,
+          "/docs/src/",
+          escapeUriComponent modName,
+          ".html"
         ]
-  where
-    escape :: Text -> Text
-    escape = T.pack . escapeURIString isUnescapedInURIComponent . T.unpack
+
+escapeUriComponent :: Text -> Text
+escapeUriComponent =
+  T.pack . escapeURIString isUnescapedInURIComponent . T.unpack
 
 -- | Each module needs its plugins loaded explicitly.
 loadModulePlugins :: ModSummary -> Ghc ModSummary
