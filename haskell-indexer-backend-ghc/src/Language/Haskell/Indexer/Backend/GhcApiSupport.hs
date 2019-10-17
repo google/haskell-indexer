@@ -40,12 +40,23 @@ import Control.Monad ((>=>), forM_, unless, void)
 import Control.Monad.IO.Class
 import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.List as L
-import Data.Maybe (isNothing)
+import Data.Maybe (catMaybes, isNothing)
+import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
+import Distribution.InstalledPackageInfo
+    ( InstalledPackageInfo(..)
+    , ParseResult(..)
+    , parseInstalledPackageInfo
+    )
+import Distribution.Simple.Utils (readUTF8File)
+import Distribution.Types.PackageId (pkgName)
+import Distribution.Types.PackageName (unPackageName)
 
 import GHC.Paths (libdir)
 import Network.URI (escapeURIString, isUnescapedInURIComponent)
+import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import System.Posix.Signals (installHandler, sigINT, Handler(Default))
 import System.IO (hPutStrLn, stderr)
@@ -84,7 +95,8 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         = withMVar globalLock . const $ do
     -- TODO(robinpalotai): logging
     printErr "Running GHC"
-    xrefGraph <- runGhc (Just $ gaLibdirPrefix </> libdir) $ do
+    let ghcLibDir = gaLibdirPrefix </> libdir
+    xrefGraph <- runGhc (Just ghcLibDir) $ do
         -- see GHC trac #4162
         liftIO . void $ installHandler sigINT Default Nothing
         -- Keeping the current dflags in mutable state, to avoid accidentally
@@ -201,7 +213,8 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
             extractXref = analyseTypechecked env analysisOpts
         mapM (loadModulePlugins >=> parseModule >=> typecheckModule >=> extractXref)
                 (mgModSummaries graph)
-    let xrefGraph' = attachDocUriDecls xrefGraph
+    globalPkgs <- readGlobalPackages ghcLibDir
+    let xrefGraph' = attachDocUriDecls globalPkgs xrefGraph
     mapM_ xrefSink xrefGraph'
  where
     getWarnMsg :: Warn -> String
@@ -247,18 +260,18 @@ withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
 -- likely those from core packages. Hence their decls may be duplicated coming
 -- from multiple analyses. Deduplicate them, and put them in the 'xrefDocDecls'
 -- field of the first 'XRef'.
-attachDocUriDecls :: [XRef] -> [XRef]
-attachDocUriDecls graph =
+attachDocUriDecls :: Set Text -> [XRef] -> [XRef]
+attachDocUriDecls globalPkgs graph =
     let tickRefs = concatMap xrefCrossRefs graph
-        docDecls = generateDocUriDecls tickRefs
+        docDecls = generateDocUriDecls globalPkgs tickRefs
      in case graph of
             [] -> []
             x : xs -> x {xrefDocDecls = docDecls} : xs
 
 data Deduping = Deduping { dedupTick :: Tick, dedupKey :: (PkgModule, Text) }
 
-generateDocUriDecls :: [TickReference] -> [DocUriDecl]
-generateDocUriDecls refs =
+generateDocUriDecls :: Set Text -> [TickReference] -> [DocUriDecl]
+generateDocUriDecls globalPkgs refs =
   map (\t -> DocUriDecl {ddeclTick = t, ddeclDocUri = hackageSrcUrl t})
     dedupedPotentialDocUriTargetTicks
   where
@@ -269,9 +282,10 @@ generateDocUriDecls refs =
         . filter (\t -> tickUniqueInModule t && needsDocUri t)
         . map refTargetTick
         $ refs
-    -- An empty name span probably means something from core packages.
-    -- Associate with the hackage document.
-    needsDocUri = isNothing . tickSpan
+    -- Things from core packages are not indexed. Associate them with its
+    -- hackage document.
+    needsDocUri t = (isNothing . tickSpan) t && isFromCorePackage t
+    isFromCorePackage t = (getPackage . tickPkgModule) t `S.member` globalPkgs
 
 hackageSrcUrl :: Tick -> Text
 hackageSrcUrl tick =
@@ -297,3 +311,21 @@ loadModulePlugins modsum = do
     hsc_env <- getSession
     dynflags' <- liftIO (initializePlugins hsc_env (ms_hspp_opts modsum))
     return $ modsum { ms_hspp_opts = dynflags' }
+
+readGlobalPackages :: String -> IO (Set Text)
+readGlobalPackages ghcLibDir = do
+    let confDir = ghcLibDir </> "package.conf.d"
+    entries <- listDirectory confDir
+    let confFiles = (confDir </>) <$> filter (".conf" `L.isSuffixOf`) entries
+    S.fromList . catMaybes <$> mapM parsePackageInfo confFiles
+  where
+    parsePackageInfo :: FilePath -> IO (Maybe Text)
+    parsePackageInfo f = do
+        content <- readUTF8File f
+        case parseInstalledPackageInfo content of
+            ParseOk _ info -> return $ Just $ packageName info
+            ParseFailed err -> do
+                hPutStrLn stderr $ "Error parsing " ++ f ++ ": " ++ show err
+                return Nothing
+    packageName :: InstalledPackageInfo -> Text
+    packageName = T.pack . unPackageName . pkgName . sourcePackageId
