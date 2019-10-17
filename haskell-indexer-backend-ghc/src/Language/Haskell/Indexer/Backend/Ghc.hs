@@ -557,14 +557,19 @@ relationsFromRenamed ctx declAlts (hsGroup, _, _, _) =
 
 -- | Exports module imports.
 importsFromRenamed :: GhcMonad m => ExtractCtx -> RenamedSource -> m [ModuleTick]
-importsFromRenamed ctx (_, lImportDecls, _, _) = mapM mkImport lImportDecls
+importsFromRenamed ctx (_, lImportDecls, _, _) =
+    catMaybes <$> mapM mkImport lImportDecls
   where
-    mkImport :: GhcMonad m => LImportDecl GhcRn -> m ModuleTick
-    mkImport (L _ implDecl) = do
-      pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
-      let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
-      return $ ModuleTick pkgModule pkgSpan
-
+    mkImport :: GhcMonad m => LImportDecl GhcRn -> m (Maybe ModuleTick)
+    mkImport (L _ implDecl)
+        -- Implicit imports (Prelude) have no target nodes. Don't generate
+        -- tickets. Also the anchors are put to weird locations (the whole
+        -- module declaration), which is surprising to users.
+      | ideclImplicit implDecl = return Nothing
+      | otherwise = do
+          pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
+          let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
+          return $ Just $ ModuleTick pkgModule pkgSpan
     extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
     extractPkgModule name = findModule name Nothing >>= return . extractModuleName ctx
 
