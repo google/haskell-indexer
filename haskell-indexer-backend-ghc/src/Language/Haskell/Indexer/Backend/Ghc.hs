@@ -562,6 +562,9 @@ importsFromRenamed ctx (_, lImportDecls, _, _) =
   where
     mkImport :: GhcMonad m => LImportDecl GhcRn -> m (Maybe ModuleTick)
     mkImport (L _ implDecl)
+        -- Implicit imports (Prelude) have no target nodes. Don't generate
+        -- tickets. Also the anchors are put to weird locations (the whole
+        -- module declaration), which is surprising to users.
       | ideclImplicit implDecl = return Nothing
       | otherwise = do
           pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
