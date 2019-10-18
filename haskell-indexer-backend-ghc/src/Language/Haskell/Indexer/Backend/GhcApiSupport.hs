@@ -36,7 +36,7 @@ import qualified Pretty
 
 import Control.Arrow ((&&&))
 import Control.Concurrent.MVar (MVar, withMVar)
-import Control.Monad ((>=>), forM_, unless, void)
+import Control.Monad ((>=>), forM_, guard, unless, void)
 import Control.Monad.IO.Class
 import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.List as L
@@ -307,11 +307,10 @@ generateModuleDocUriDecls globalPkgs indexedModules imports =
    in mapMaybe generate mts
   where
     generate :: ModuleTick -> Maybe ModuleDocUriDecl
-    generate mt =
+    generate mt = do
       let pm = mtPkgModule mt
-       in if needsDocUri pm
-            then Just $ ModuleDocUriDecl mt (hackageSrcUrlForModule pm)
-            else Nothing
+      guard $ needsDocUri pm
+      return $ ModuleDocUriDecl mt (hackageSrcUrlForModule pm)
     needsDocUri pm = not (pm `S.member` indexedModules) && isFromCorePackage pm
     isFromCorePackage pm = getPackage pm `S.member` globalPkgs
 
