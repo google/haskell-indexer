@@ -303,14 +303,15 @@ generateDocUriDecls globalPkgs refs =
 generateModuleDocUriDecls ::
   Set Text -> Set PkgModule -> [ModuleTick] -> [ModuleDocUriDecl]
 generateModuleDocUriDecls globalPkgs indexedModules imports =
-  let pms = L.nub $ map mtPkgModule imports
-   in mapMaybe generate pms
+  let mts = nubOrdOn mtPkgModule $ imports
+   in mapMaybe generate mts
   where
-    generate :: PkgModule -> Maybe ModuleDocUriDecl
-    generate pm =
-      if needsDocUri pm
-        then Just $ ModuleDocUriDecl pm (hackageSrcUrlForModule pm)
-        else Nothing
+    generate :: ModuleTick -> Maybe ModuleDocUriDecl
+    generate mt =
+      let pm = mtPkgModule mt
+       in if needsDocUri pm
+            then Just $ ModuleDocUriDecl mt (hackageSrcUrlForModule pm)
+            else Nothing
     needsDocUri pm = not (pm `S.member` indexedModules) && isFromCorePackage pm
     isFromCorePackage pm = getPackage pm `S.member` globalPkgs
 

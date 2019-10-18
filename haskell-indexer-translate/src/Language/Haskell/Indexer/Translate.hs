@@ -101,7 +101,7 @@ data ModuleTick = ModuleTick
       -- For example, 'X' in 'module X where'.
       -- Main modules can have this missing.
     }
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | A Tick(et) is a globally unique identifier for some entity in the AST.
 -- Not mandatory, but is ideally stable across multiple compilations.
@@ -152,7 +152,7 @@ data DocUriDecl = DocUriDecl
     deriving (Eq, Show)
 
 data ModuleDocUriDecl = ModuleDocUriDecl
-    { mddeclPkgModule :: !PkgModule
+    { mddeclTick :: !ModuleTick
     , mddeclDocUri :: !Text  -- ^ Document URI for the module.
     }
     deriving (Eq, Show)

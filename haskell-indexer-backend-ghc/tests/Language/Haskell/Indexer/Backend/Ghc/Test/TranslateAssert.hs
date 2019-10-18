@@ -23,9 +23,11 @@ module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     --
     , declsAt, declAt
     , docUriDecl
+    , moduleDocUriDecl
     --
     , usages, singleUsage
     , docUriDeclUsages, singleDocUriDeclUsage
+    , moduleDocUriDeclImports, singleModuleDocUriDeclImport
     --
     , includesPos, spanIs
     , refKindIs, refContextIs
@@ -100,6 +102,23 @@ docUriDecl uri = docUriDecls uri >>= \case
         , ":\n", prettyDocUriDecls ds
         ]
 
+moduleDocUriDecls :: T.Text -> ReaderT XRef IO [ModuleDocUriDecl]
+moduleDocUriDecls uri = do
+    decls <- asks xrefModuleDocDecls
+    let filtered = filter ((== uri) . mddeclDocUri) decls
+    liftIO $ not (null filtered) @? concat
+        [ "No module declarations with doc/uri ", T.unpack uri]
+    return $! L.sortBy (comparing mddeclTick) filtered
+
+moduleDocUriDecl :: T.Text -> ReaderT XRef IO ModuleDocUriDecl
+moduleDocUriDecl uri = moduleDocUriDecls uri >>= \case
+    [] -> error "moduleDocUriDecls should have caught empty decls"
+    [d] -> return d
+    ds -> failConcat
+        [ "Multiple module declarations with doc/uri ", T.unpack uri
+        , ":\n", prettyModuleDocUriDecls ds
+        ]
+
 prettySpan :: Span -> String
 prettySpan (Span (Pos l1 c1 _) (Pos l2 c2 _)) = concat
     [ "("
@@ -108,6 +127,10 @@ prettySpan (Span (Pos l1 c1 _) (Pos l2 c2 _)) = concat
     , show l2, ":", show c2
     , ")"
     ]
+
+prettyMaybeSpan :: Maybe Span -> String
+prettyMaybeSpan Nothing = "<no span>"
+prettyMaybeSpan (Just s) = prettySpan s
 
 prettyDecls :: [Decl] -> String
 prettyDecls ds = L.intercalate "\n" (map prettyDecl ds) ++ "\n"
@@ -136,9 +159,27 @@ prettyDocUriDecl decl =
           "}"
         ]
 
+prettyModuleDocUriDecls :: [ModuleDocUriDecl] -> String
+prettyModuleDocUriDecls ds = L.intercalate "\n" (map prettyModuleDocUriDecl ds) ++ "\n"
+
+prettyModuleDocUriDecl :: ModuleDocUriDecl -> String
+prettyModuleDocUriDecl decl =
+    concat
+        [ "ModuleDocUriDecl { module: ",
+          show (mtPkgModule $ mddeclTick decl),
+          ", doc/uri: ",
+          show (mddeclDocUri decl),
+          "}"
+        ]
+
 prettyReference :: TickReference -> String
 prettyReference ref = "TickReference {"
                    ++ ", pos: " ++ prettySpan (refSourceSpan ref)
+                   ++ "}"
+
+prettyModuleTick :: ModuleTick -> String
+prettyModuleTick mt = "ModuleTick {"
+                   ++ ", pos: " ++ prettyMaybeSpan (mtSpan mt)
                    ++ "}"
 
 -- | Returns the module imports that include the given position.
@@ -204,6 +245,26 @@ singleDocUriDeclUsage decl = docUriDeclUsages decl >>= \case
     us -> failConcat
         [ "Multiple usages of decl ", prettyDocUriDecl decl
         , ":\n", L.intercalate "\n" $ map prettyReference us
+        ]
+
+-- | Returns usages of a given module declaration in span-sorted order.
+-- Fails if no usages found.
+moduleDocUriDeclImports :: ModuleDocUriDecl -> ReaderT XRef IO [ModuleTick]
+moduleDocUriDeclImports decl = do
+    res <- filter (== mddeclTick decl) <$> asks xrefImports
+    liftIO $ not (null res) @? concat
+          ["No usages found for module decl ", prettyModuleDocUriDecl decl]
+    return $! L.sortBy (comparing mtSpan) res
+
+-- | Returns the single usage of the given module declaration.
+-- Fails if there isn't exactly one usage.
+singleModuleDocUriDeclImport :: ModuleDocUriDecl -> ReaderT XRef IO ModuleTick
+singleModuleDocUriDeclImport decl = moduleDocUriDeclImports decl >>= \case
+    [] -> error "usages should have caught empty usages"
+    [u] -> return u
+    us -> failConcat
+        [ "Multiple usages of module decl ", prettyModuleDocUriDecl decl
+        , ":\n", L.intercalate "\n" $ map prettyModuleTick us
         ]
 
 -- | Asserts that the given thing's span includes the given position.

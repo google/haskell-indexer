@@ -167,7 +167,8 @@ makeDocDeclFacts DocUriDecl{..} = do
 makeModuleDocDeclFacts :: ModuleDocUriDecl -> Conversion [Raw.Entry]
 makeModuleDocDeclFacts ModuleDocUriDecl{..} = do
     vn <- asks baseVName
-    let NameAndEntries pkgVn pkgEntries = makePackageFacts vn mddeclPkgModule
+    let pm = mtPkgModule mddeclTick
+        NameAndEntries pkgVn pkgEntries = makePackageFacts vn pm
         docUriFacts =
             nodeFacts pkgVn PackageNK
               [ nodeFact DocUriF (T.encodeUtf8 mddeclDocUri),
