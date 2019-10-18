@@ -75,6 +75,7 @@ toKythe basevn content XRef{..} = do
                            Nothing Nothing)
         mapM_ (stream . makeDeclFacts) xrefDecls
         mapM_ (stream . makeDocDeclFacts) xrefDocDecls
+        mapM_ (stream . makeModuleDocDeclFacts) xrefModuleDocDecls
         mapM_ (stream . makeUsageFacts) xrefCrossRefs
         mapM_ (stream . makeRelationFacts) xrefRelations
         mapM_ (stream . makeImportFacts) xrefImports
@@ -161,6 +162,19 @@ makeDocDeclFacts DocUriDecl{..} = do
                 [ nodeFact DocUriF (T.encodeUtf8 ddeclDocUri)
                 , nodeFact CompleteF Definition
                 ]
+
+-- | Makes all entries for a module's doc/uri declaration.
+makeModuleDocDeclFacts :: ModuleDocUriDecl -> Conversion [Raw.Entry]
+makeModuleDocDeclFacts ModuleDocUriDecl{..} = do
+    vn <- asks baseVName
+    let pm = mtPkgModule mddeclTick
+        NameAndEntries pkgVn pkgEntries = makePackageFacts vn pm
+        docUriFacts =
+            nodeFacts pkgVn PackageNK
+              [ nodeFact DocUriF (T.encodeUtf8 mddeclDocUri),
+                nodeFact CompleteF Definition
+              ]
+    return $ pkgEntries ++ docUriFacts
 
 -- | Makes entries for an anchor (either explicit or implicit)..
 --

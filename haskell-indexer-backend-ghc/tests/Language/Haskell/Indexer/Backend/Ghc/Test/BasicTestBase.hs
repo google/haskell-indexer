@@ -407,14 +407,25 @@ testImportRefsHiding =
 
 testDocUri :: AssertionInEnv
 testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
+  moduleDocUriDecl
+    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/Data.Maybe.html"
+    >>= singleModuleDocUriDeclImport -- Data.Maybe
+    >>= includesPos (3, 8)
   docUriDecl
-    "https://hackage.haskell.org/package/ghc-prim-0.5.3/docs/src/GHC.Types.html#IO"
-    >>= singleDocUriDeclUsage
-    >>= includesPos (3, 6)
+    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/GHC.Maybe.html#Maybe"
+    >>= singleDocUriDeclUsage -- Maybe
+    >>= includesPos (5, 7)
   docUriDecl
-    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/System.IO.html#putStrLn"
-    >>= singleDocUriDeclUsage
-    >>= includesPos (4, 5)
+    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/Data.Maybe.html#catMaybes"
+    >>= docUriDeclUsages -- catMaybes
+    >>= \case
+      [u1, u2] -> do
+        includesPos (3, 20) u1
+        includesPos (6, 5) u2
+      us ->
+        checking
+          $ assertFailure
+          $ "Usage count differs for catMaybes: " ++ show us
 
 testPatternSynonyms :: AssertionInEnv
 testPatternSynonyms = assertXRefsFrom ["basic/PatSyn.hs"] $ do

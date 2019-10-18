@@ -1,4 +1,6 @@
 module DocUri where
 
-f :: IO ()
-f = putStrLn "hello"
+import Data.Maybe (catMaybes)
+
+f :: [Maybe a] -> [a]
+f = catMaybes
