@@ -21,10 +21,13 @@
 
 module Data.Text.Offset
   ( OffsetTable
+  -- * Creation
   , createOffsetTable
-  , lineColToByteOffset
-  , OffsetError(..), OverLineKind(..)
+  -- * Querying
   , lineColToByteOffsetDetail
+  , lineColToByteOffset
+  , OffsetError(..)
+  , OverLineKind(..)
   ) where
 
 import Control.Monad (unless)
@@ -120,7 +123,7 @@ lineColToByteOffsetDetail OffsetTable{..} line col = do
     note :: e -> Maybe a -> Either e a
     note e = maybe (Left e) Right
 
--- | Like 'lineColToByteOffset', but without failure details.
+-- | Like 'lineColToByteOffsetDetail', but without failure details.
 lineColToByteOffset :: OffsetTable -> Int -> Int -> Maybe Int
 lineColToByteOffset t l c = case lineColToByteOffsetDetail t l c of
     Left _  -> Nothing

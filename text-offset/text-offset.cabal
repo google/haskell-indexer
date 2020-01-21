@@ -1,13 +1,13 @@
 name:                text-offset
 version:             0.1.0.0
 synopsis:            Library for converting between line/column and byte offset.
-description:         Useful for translating visual line/column info (from
-                     editor or warning message) to byte offset. Assumes UTF-8.
+description:         Translates visual line/column info (as from editor or
+                     warning message) to byte offset. Assumes UTF-8 encoding.
 homepage:            https://github.com/google/haskell-indexer
 license:             Apache-2.0
 license-file:        LICENSE
 author:              Robin Palotai
-maintainer:          robinpalotai@google.com
+maintainer:          palotai.robin@gmail.com
 copyright:           Google Inc.
 category:            Text
 build-type:          Simple
@@ -16,9 +16,9 @@ cabal-version:       2.0
 library
   hs-source-dirs:      src
   exposed-modules:     Data.Text.Offset
-  build-depends:       base >=4.7 && <5
-                     , text
-                     , vector
+  build-depends:       base >= 4.7 && < 4.13
+                     , text >= 1.2.0.6 && < 1.3
+                     , vector >= 0.10.2.3 && < 0.13
   ghc-options:         -Wall
                        -Wcompat
                        -Wincomplete-record-updates
@@ -32,14 +32,14 @@ Test-Suite offset_test
   main-is: OffsetTest.hs
   hs-source-dirs: tests
   build-depends: base
-               , bytestring
-               , test-framework
-               , test-framework-hunit
-               , test-framework-quickcheck2
+               , bytestring >= 0.10.4 && < 0.11
+               , test-framework >= 0.8.1.1 && < 0.9
+               , test-framework-hunit >= 0.3.0.1 && < 0.4
+               , test-framework-quickcheck2 >= 0.3.0.3 && < 0.4
                , text
                , text-offset
-               , HUnit
-               , QuickCheck
+               , HUnit >= 1.2.5.2 && < 1.7
+               , QuickCheck >= 2.7.6 && < 2.14
   ghc-options:         -Wall
                        -Wcompat
                        -Wincomplete-record-updates
