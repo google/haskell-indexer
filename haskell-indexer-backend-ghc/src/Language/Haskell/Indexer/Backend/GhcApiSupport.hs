@@ -96,8 +96,11 @@ withTypechecked
 withTypechecked globalLock GhcArgs{..} analysisOpts xrefSink
         = withMVar globalLock . const $ do
     -- TODO(robinpalotai): logging
-    printErr "Running GHC"
-    let ghcLibDir = gaLibdirPrefix </> libdir
+    let ghcLibDir = case gaLibdirOverride of
+          Nothing -> libdir
+          Just (AddPrefixToLibdir prefix) -> prefix </> libdir
+          Just (OverrideLibdir path) -> path
+    printErr ("Running GHC, libdir: " ++ ghcLibDir)
     xrefGraph <- runGhc (Just ghcLibDir) $ do
         -- see GHC trac #4162
         liftIO . void $ installHandler sigINT Default Nothing

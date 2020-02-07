@@ -57,8 +57,9 @@ data Flags = Flags
     , flagPrependPathPrefix   :: !(Maybe Text)
     , flagKeepTempPathPrefix  :: !Bool
     , flagOverridePgmP        :: !(Maybe FilePath)
+    , flagOverrideLibdir      :: !(Maybe FilePath)
     -- Path to a directory where to place the output files when running
-    -- the plugin.
+    -- in plugin mode.
     , flagOutput              :: !(Maybe FilePath)
     }
 
@@ -116,10 +117,16 @@ flagParser = Flags
                       ++ "options. Note: other tools can still be overriden "
                       ++ "by passing the regular -pgmX GHC options.")))
      <*> optional (strOption
+             (  long "libdir"
+             <> short 'B'
+             <> metavar "PATH"
+             <> help ("Overrides the GHC libdir.")))
+     <*> optional (strOption
             ( long "output"
             <> short 'o'
             <> metavar "INDEX_OUT_DIR"
-            <> help ("The directory to write the indices to")))
+            <> help ("The directory to write the indices to in plugin mode. "
+                     ++ "Normal mode emits entry stream to stdout.")))
 
 index :: [String] -> Flags -> IO ()
 index args fs = do
@@ -134,11 +141,12 @@ indexX
         -> (Handle -> [Raw.Entry] -> IO ()) -> IO ())
   -> [String] -> Flags -> IO ()
 indexX k args Flags{..} = do
-    let ghcArgs = defaultGhcArgs
+    let ghcArgs = GhcArgs
             { gaArgs = args
             , gaToolOverride = ToolOverride
                 { overridePgmP = flagOverridePgmP
                 }
+            , gaLibdirOverride = OverrideLibdir <$> flagOverrideLibdir
             }
         analysisOptions = AnalysisOptions
             { aoMainPkgFallback = fromMaybe "main" flagMainPackageRename
