@@ -13,14 +13,14 @@
 -- limitations under the License.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-| Converts GHC typechecked AST into intermediate Analysed format.
 
 This module should not assume anything about the backend consuming the
@@ -217,7 +217,7 @@ hsTypeVarName _ = Nothing
 --                         Are those in the typechecked AST?
 declsFromRenamed :: ExtractCtx -> RenamedSource -> ([DeclAndAlt], DeclMods)
 declsFromRenamed ctx (hsGroup, _, _, _) =
-    let defs = hs_tyclds hsGroup >>= group_tyclds >>= dataDecls
+    let defs = hs_tyclds hsGroup >>= group_tyclds >>= tyClDecls
         (instDefs, instChanges) = second M.unions . unzip . mapMaybe instDecls
                                 . hsGroupInstDecls
                                 $ hsGroup
@@ -297,10 +297,11 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     hsTyVarBinderName (KindedTyVar _ n _) = unLoc n
     hsTyVarBinderName (XTyVarBndr _) =
         error "should not hit XTyVarBndr when accessing renamed AST"
+    -- Data, class, synonym, and family declarations.
+    tyClDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
     -- Datatypes.
-    dataDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
-    dataDecls (L _ (DataDecl _ locName binders _ defn)) =
-        let top = dataCtorLikeDecl locName
+    tyClDecls (L _ (DataDecl _ locName binders _ defn)) =
+        let top = tyConLikeDecl locName
             ctors = map (conDecls . unLoc) . dd_cons $ defn
             tyvars = declsFromDataBinders binders
         in top:(ctors ++ tyvars)
@@ -314,7 +315,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         conDeclNames (ConDeclGADT { con_names = conNames }) = conNames
         conDeclNames (XConDecl _) = error "unexpected XConDecl"
     -- Type aliases.
-    dataDecls (L _ sd@(SynDecl _ locName binders _ _)) =
+    tyClDecls (L _ sd@(SynDecl _ locName binders _ _)) =
         -- For type aliases we use 'dataLikeDecl' to render the full definition
         -- into the docstring, which is usually short and helpful for aliases.
         let alias = dataLikeDecl sd locName
@@ -322,11 +323,12 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         in alias:tyvars
     -- Typeclasses.
     -- TODO(robinpalotai): functional dependencies.
-    dataDecls (L _ (ClassDecl _ _ locName binders _ _ sigs _ _ _ _)) =
-        let top = dataCtorLikeDecl locName
+    tyClDecls (L _ (ClassDecl _ _ locName binders _ _ sigs _ ats _ _)) =
+        let top = tyConLikeDecl locName
             tyvars = declsFromDataBinders binders
             fromSigs = concatMap (sigDecls . unLoc) sigs
-        in top:(fromSigs ++ tyvars)
+            assocTys = concatMap (famDecls . unLoc) ats
+        in top : fromSigs ++ tyvars ++ assocTys
       where
         -- For typeclasses, we emit the declaration from the method name in the
         -- method signature (as opposed to normal functions, where we emit from
@@ -336,9 +338,20 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             ClassOpSig _ _ lnames ty -> map (dataLikeDecl ty) lnames
             -- TODO(robinpalotai): PatSynSig
             _ -> []
-    -- Other
-    dataDecls _ = []
-    --
+    tyClDecls (L _ (FamDecl _extDecl fd)) = famDecls fd
+    tyClDecls (L _ (XTyClDecl NoExt)) = []
+
+    -- These appear both in top-level decls and in class decls.
+    famDecls :: FamilyDecl GhcRn -> [DeclAndAlt]
+    famDecls (XFamilyDecl NoExt) = []
+    famDecls (FamilyDecl NoExt _inf locName binders _fixity _resSig _inj) =
+        famDecl : tyvars
+      where
+        -- TODO _inf can contain clauses; index those.
+        -- TODO _resSig is the kind information that tyConLikeDecl is omitting.
+        famDecl = tyConLikeDecl locName
+        tyvars = declsFromDataBinders binders
+
     instDecls (L wholeSrcSpan (ClsInstD _ (ClsInstDecl _ lty lbinds _ _ _ _)))
         = do
         -- 1) We emit the instance declaration with the idSpan set to
@@ -381,7 +394,9 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     --
     dataLikeDecl :: (GHC.Outputable a) => a -> Located Name -> DeclAndAlt
     dataLikeDecl a = declWithWrappedIdLoc (outputableStringyType ctx a)
-    dataCtorLikeDecl = declWithWrappedIdLoc typeStringyType
+    -- A DeclAndAlt for a type constructor or similar construct e.g. (a type
+    -- family or typeclass constructor).
+    tyConLikeDecl = declWithWrappedIdLoc typeStringyType
     declWithWrappedIdLoc declType locatedName =
         let idLoc = getLoc locatedName
             nameWithBroadLoc = unLoc locatedName
