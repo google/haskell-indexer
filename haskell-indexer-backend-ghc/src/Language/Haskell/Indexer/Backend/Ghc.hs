@@ -67,6 +67,7 @@ import Data.Reflection (Given, give, given)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Stack (HasCallStack) -- (From "base", not "ghc").
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -209,6 +210,14 @@ hsTypeVarName :: HsType GhcRn -> Maybe (Located Name)
 hsTypeVarName (HsTyVar _ _ n) = Just $! n
 hsTypeVarName _ = Nothing
 
+-- Stand-in for 'noExtCon' of the empty data type 'NoExtCon' in GHC 8.8+, which
+-- replaces 'NoExt' in extension point constructors to make them
+-- unconstructable rather than trivial to construct, with a useless value.
+--
+-- When migrating to newer GHC, just delete this stand-in and import the
+-- newly-added one, and all should be well.
+noExtCon :: HasCallStack => NoExt -> a
+noExtCon NoExt = error "noExtCon: this was meant to be inaccessible."
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
@@ -292,14 +301,12 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     declsFromDataBinders = map (mkDecl . hsTyVarBinderName . unLoc) . hsqShim
       where
         mkDecl n = nameDeclAlt ctx n Nothing typeStringyType
-    hsTyVarBinderName :: HsTyVarBndr id -> IdP id
+    hsTyVarBinderName :: HsTyVarBndr GhcRn -> IdP GhcRn
     hsTyVarBinderName (UserTyVar _ n) = unLoc n
     hsTyVarBinderName (KindedTyVar _ n _) = unLoc n
-    hsTyVarBinderName (XTyVarBndr _) =
-        error "should not hit XTyVarBndr when accessing renamed AST"
+    hsTyVarBinderName (XTyVarBndr no) = noExtCon no
     -- Data, class, synonym, and family declarations.
     tyClDecls :: LTyClDecl GhcRn -> [DeclAndAlt]
-    -- Datatypes.
     tyClDecls (L _ (DataDecl _ locName binders _ defn)) =
         let top = tyConLikeDecl locName
             ctors = map (conDecls . unLoc) . dd_cons $ defn
@@ -313,7 +320,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             in dataLikeDecl cd conLName
         conDeclNames (ConDeclH98 { con_name = conName })  = [conName]
         conDeclNames (ConDeclGADT { con_names = conNames }) = conNames
-        conDeclNames (XConDecl _) = error "unexpected XConDecl"
+        conDeclNames (XConDecl no) = noExtCon no
     -- Type aliases.
     tyClDecls (L _ sd@(SynDecl _ locName binders _ _)) =
         -- For type aliases we use 'dataLikeDecl' to render the full definition
@@ -339,15 +346,14 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
             -- TODO(robinpalotai): PatSynSig
             _ -> []
     tyClDecls (L _ (FamDecl _extDecl fd)) = famDecls fd
-    tyClDecls (L _ (XTyClDecl NoExt)) = []
+    tyClDecls (L _ (XTyClDecl no)) = noExtCon no
 
     -- These appear both in top-level decls and in class decls.
     famDecls :: FamilyDecl GhcRn -> [DeclAndAlt]
-    famDecls (XFamilyDecl NoExt) = []
-    famDecls (FamilyDecl NoExt _inf locName binders _fixity _resSig _inj) =
+    famDecls (XFamilyDecl no) = noExtCon no
+    famDecls (FamilyDecl NoExt _ locName binders _ _resSig _) =
         famDecl : tyvars
       where
-        -- TODO _inf can contain clauses; index those.
         -- TODO _resSig is the kind information that tyConLikeDecl is omitting.
         famDecl = tyConLikeDecl locName
         tyvars = declsFromDataBinders binders
@@ -458,6 +464,8 @@ refsFromRenamed :: ExtractCtx -> DeclAltMap -> RenamedSource
                 -> [TickReference]
 refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
     let typeRefs = mapMaybe refsFromHsType (universeBi hsGroup)
+        instRefs = hs_tyclds hsGroup >>= group_instds >>= tyInstRefs . unLoc
+        declRefs = hs_tyclds hsGroup >>= group_tyclds >>= tyClDeclRefs . unLoc
         -- TODO(robinpalotai): maybe add context. It would need first finding
         --   the context roots, and only then doing the traversal.
         sigRefs = case hs_valds hsGroup of
@@ -469,9 +477,42 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
         importRefs = concatMap refsFromImportDecl importDecls
         exportRefs = refsFromExports exports
         refContext = Nothing
-    in map (toTickReference ctx refContext declAlts)
-           (typeRefs ++ sigRefs ++ importRefs ++ exportRefs)
+    in map (toTickReference ctx refContext declAlts) $ mconcat
+           [typeRefs, sigRefs, importRefs, exportRefs, instRefs, declRefs]
   where
+    -- References from family instances to their family.
+    tyInstRefs :: InstDecl GhcRn -> [Reference]
+    tyInstRefs (TyFamInstD NoExt (TyFamInstDecl decl)) = ibFamEqnRefs decl
+    tyInstRefs (DataFamInstD NoExt (DataFamInstDecl decl)) = ibFamEqnRefs decl
+    tyInstRefs (ClsInstD NoExt decl) = clsInstRefs decl
+    tyInstRefs (XInstDecl no) = noExtCon no
+
+    -- References from closed family bodies to their enclosing family.
+    tyClDeclRefs :: TyClDecl GhcRn -> [Reference]
+    tyClDeclRefs (FamDecl NoExt fam) = case fam of
+      FamilyDecl NoExt info _ _ _ _ _ -> case info of
+        ClosedTypeFamily (Just insts) ->
+          concatMap (famEqnRefs . hsib_body . unLoc) insts
+        _ -> []
+      XFamilyDecl no -> noExtCon no
+    tyClDeclRefs _ = []
+
+    -- References from associated family instances to their family.
+    clsInstRefs :: ClsInstDecl GhcRn -> [Reference]
+    clsInstRefs (ClsInstDecl NoExt _ _ _ tyInsts dataInsts _) =
+      concatMap (ibFamEqnRefs . tfid_eqn . unLoc) tyInsts ++
+      concatMap (ibFamEqnRefs . dfid_eqn . unLoc) dataInsts
+    clsInstRefs (XClsInstDecl no) = noExtCon no
+
+    ibFamEqnRefs :: FamInstEqn GhcRn a -> [Reference]
+    ibFamEqnRefs (HsIB (HsIBRn _vars _closed) eqn) = famEqnRefs eqn
+    ibFamEqnRefs (XHsImplicitBndrs no) = noExtCon no
+
+    famEqnRefs :: FamEqn GhcRn a b -> [Reference]
+    famEqnRefs (FamEqn NoExt (L loc tycon) _ _ _) =
+        maybeToList $ give ctx $ nameLocToRef tycon Ref loc
+    famEqnRefs (XFamEqn no) = noExtCon no
+
     refsFromHsType :: LHsType GhcRn -> Maybe Reference
     refsFromHsType (L l ty) = case hsTypeVarName ty of
         -- Basic variable at the leaves of type trees.
