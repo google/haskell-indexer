@@ -56,6 +56,10 @@ for fut in \
     "$BASIC/RecursiveRef.hs" \
     "$BASIC/TypeclassRef.hs" \
     "$BASIC/TypeDef.hs" \
+    "$BASIC/TypeFam.hs" \
+    "$BASIC/DataFam.hs" \
+    "$BASIC/ClosedFam.hs" \
+    "$BASIC/AssocType.hs" \
     "$BASIC/TypeOperators.hs" \
     "$BASIC/TypeVarInSig.hs"
 do
