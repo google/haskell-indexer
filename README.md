@@ -34,8 +34,14 @@ Download Stack from http://docs.haskellstack.org
 
 ## Kythe
 
-If you want to use the Kythe frontend, download a [Kythe
-release](https://github.com/google/kythe/releases) and unpack it.
+If you want to use the Kythe frontend, you'll need to install it either from
+source or from the official release.  The latter is easier, but the web UI has
+been removed in recent versions.
+
+### Official Release
+
+Download a [Kythe release](https://github.com/google/kythe/releases) and unpack
+it.
 
 ```
 tar xzf kythe-v0.0.26.tar.gz -C /opt/
@@ -44,10 +50,26 @@ ln -s /opt/kythe-v0.0.26 /opt/kythe
 chmod -R 755 /opt/kythe/web/ui  # It misses permission by default.
 ```
 
-Version `v0.0.26` is verified to work with Haskell indexer.
+Version `v0.0.30` is the latest version that includes the web UI.  If you want a
+newer Kythe than this, you'll need to build from source.
 
 If you want to install Kythe in a different location to `/opt/kythe` then you
 should also set `KYTHE_DIR` to the location of the installation.
+
+### Building From Source
+
+Clone Kythe from [its GitHub repo](https://github.com/google/kythe/releases) and
+follow the [Getting Started guide](https://kythe.io/getting-started/) to build
+and install it into `/opt/kythe`.  Then, from within the Kythe clone, build the
+web frontend and copy its files into their rightful place:
+
+```
+bazel build //kythe/web/ui
+mkdir -p /opt/kythe/web/ui
+cp -r bazel-bin/kythe/web/ui/resources/public/* /opt/kythe/web/ui
+cp -r kythe/web/ui/resources/public/* /opt/kythe/web/ui
+chmod -R 755 /opt/kythe/web/ui
+```
 
 ## Protoc 3
 
