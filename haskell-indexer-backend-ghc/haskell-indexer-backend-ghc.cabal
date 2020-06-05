@@ -22,8 +22,9 @@ library
                        Language.Haskell.Indexer.Backend.GhcArgs
                        Language.Haskell.Indexer.Backend.GhcApiSupport
                        Language.Haskell.Indexer.Backend.GhcEnv
-  build-depends:       Cabal >= 2.4 && <3
+  build-depends:       Cabal >= 2.4 && < 3.3
                      , base >=4.8 && <5
+                     , bytestring
                      , containers
                      , directory
                      , filepath
@@ -63,6 +64,7 @@ Test-Suite basic_test
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1
+               , network-uri >= 2.6 && < 3
                , semigroups
                , temporary
                , test-framework
@@ -94,6 +96,7 @@ Test-Suite typelink_test
                , haskell-indexer-backend-core >= 0.1
                , haskell-indexer-backend-ghc
                , haskell-indexer-translate >= 0.1
+               , network-uri >= 2.6 && < 3
                , semigroups
                , temporary
                , test-framework

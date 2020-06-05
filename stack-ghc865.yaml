@@ -13,6 +13,11 @@ packages:
 - text-offset
 
 extra-deps:
+- proto-lens-0.7.0.0@sha256:2c44a62375f7712f9381f84b1d30cee2f94384f1c98801db2f4450359a8e5036,3036
+- proto-lens-protoc-0.7.0.0@sha256:04e57ec59ce21dc781b9debe063f03d85a7ec2ad1ee5c2deb1c30282119e9119,2304
+- proto-lens-runtime-0.7.0.0@sha256:d6cfab159a63f5c42a1a507638c674a714dfa5f69a06f559e8da840eaafde3ab,3115
+- proto-lens-setup-0.4.0.4@sha256:c44d1b6d68a8faf1d2f9c7ca492ce3c9c2ee66d255452c683f762f10c9ebe430,3185
+- ghc-source-gen-0.4.0.0@sha256:b6cdde6b183e70f6fbed3b0a45ad6640204b636e9a7fb898c5d7ec79719f14a1,3698
 
 # Allow our custom Setup.hs scripts to import Data.ProtoLens.Setup from the version of
 # `proto-lens-protoc` in stack's local DB.  See:

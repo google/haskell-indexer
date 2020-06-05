@@ -12,6 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -29,7 +30,9 @@ import qualified Data.ByteString as BS
 import Data.Conduit (ConduitT)
 import Data.Conduit.List (sourceList)
 import Data.Maybe (fromMaybe, maybeToList)
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
+#endif
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T

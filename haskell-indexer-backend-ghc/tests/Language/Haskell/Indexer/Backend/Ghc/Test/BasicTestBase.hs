@@ -407,16 +407,13 @@ testImportRefsHiding =
 
 testDocUri :: AssertionInEnv
 testDocUri = assertXRefsFrom ["basic/DocUri.hs"] $ do
-  moduleDocUriDecl
-    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/Data.Maybe.html"
+  moduleDocUriDecl "base" "Data.Maybe.html"
     >>= singleModuleDocUriDeclImport -- Data.Maybe
     >>= includesPos (3, 8)
-  docUriDecl
-    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/GHC.Maybe.html#Maybe"
+  docUriDecl "base" "GHC.Maybe.html" "#Maybe"
     >>= singleDocUriDeclUsage -- Maybe
     >>= includesPos (5, 7)
-  docUriDecl
-    "https://hackage.haskell.org/package/base-4.12.0.0/docs/src/Data.Maybe.html#catMaybes"
+  docUriDecl "base" "Data.Maybe.html" "#catMaybes"
     >>= docUriDeclUsages -- catMaybes
     >>= \case
       [u1, u2] -> do

@@ -18,9 +18,9 @@ library
                      , Proto.Kythe.Proto.Storage_Fields
   autogen-modules:     Proto.Kythe.Proto.Storage
                      , Proto.Kythe.Proto.Storage_Fields
-  build-tool-depends:  proto-lens-protoc:proto-lens-protoc >= 0.5
+  build-tool-depends:  proto-lens-protoc:proto-lens-protoc >= 0.7
   build-depends:       base >=4.8 && <5
-                     , proto-lens-runtime >= 0.5 && < 0.6
+                     , proto-lens-runtime >= 0.7 && < 0.8
   ghc-options:         -Wall
                        -Wcompat
                        -Wincomplete-record-updates
@@ -31,4 +31,4 @@ library
 custom-setup
   setup-depends:       base >=4.8 && <5
                      , Cabal
-                     , proto-lens-setup == 0.4.0.2
+                     , proto-lens-setup == 0.4.0.4

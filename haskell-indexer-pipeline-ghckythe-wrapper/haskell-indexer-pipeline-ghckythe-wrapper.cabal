@@ -25,7 +25,7 @@ library
                      , haskell-indexer-translate >= 0.1
                      , kythe-schema >= 0.1
                      , optparse-applicative
-                     , proto-lens >= 0.5 && < 0.6
+                     , proto-lens >= 0.7 && < 0.8
                      , text
   exposed-modules:  Language.Haskell.Indexer.Args
   ghc-options:         -Wall
