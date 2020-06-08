@@ -59,6 +59,12 @@ matrix:
     compiler: ": #stack-ghc865.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
+  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
+  # variable, such as using --stack-yaml to point to a different file.
+  - env: STACK_YAML=stack-ghc-8.10.yaml BUILD=stack
+    compiler: ": #stack-ghc-8.10.yaml"
+    addons: {apt: {packages: [libgmp-dev]}}
+
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
     compiler: ": #stack nightly"
