@@ -81,3 +81,5 @@ explicit-setup-deps:
 
 nix:
   packages: [gcc, protobuf]
+
+allow-newer: true

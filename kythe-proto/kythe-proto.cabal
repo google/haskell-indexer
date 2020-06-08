@@ -31,4 +31,5 @@ library
 custom-setup
   setup-depends:       base >=4.8 && <5
                      , Cabal
+                     , proto-lens-protoc >= 0.7
                      , proto-lens-setup == 0.4.0.4
