@@ -12,6 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
@@ -47,10 +48,16 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Distribution.InstalledPackageInfo
     ( InstalledPackageInfo(..)
+#if !MIN_VERSION_Cabal(3,0,0)
     , ParseResult(..)
+#endif
     , parseInstalledPackageInfo
     )
+#if MIN_VERSION_Cabal(3,0,0)
+import qualified Data.ByteString as BS (readFile)
+#else
 import Distribution.Simple.Utils (readUTF8File)
+#endif
 import Distribution.Types.PackageId (pkgName)
 import Distribution.Types.PackageName (unPackageName)
 
@@ -354,6 +361,15 @@ readGlobalPackages ghcLibDir = do
     S.fromList . catMaybes <$> mapM parsePackageInfo confFiles
   where
     parsePackageInfo :: FilePath -> IO (Maybe Text)
+#if MIN_VERSION_Cabal(3,0,0)
+    parsePackageInfo f = do
+        content <- BS.readFile f
+        case parseInstalledPackageInfo content of
+            Right (_, info) -> return $ Just $ packageName info
+            Left err -> do
+                hPutStrLn stderr $ "Error parsing " ++ f ++ ": " ++ show err
+                return Nothing
+#else
     parsePackageInfo f = do
         content <- readUTF8File f
         case parseInstalledPackageInfo content of
@@ -361,5 +377,6 @@ readGlobalPackages ghcLibDir = do
             ParseFailed err -> do
                 hPutStrLn stderr $ "Error parsing " ++ f ++ ": " ++ show err
                 return Nothing
+#endif
     packageName :: InstalledPackageInfo -> Text
     packageName = T.pack . unPackageName . pkgName . sourcePackageId

@@ -13,6 +13,7 @@
 -- limitations under the License.
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Language.Haskell.Indexer.Backend.Ghc.Test.TranslateAssert
     ( checking
     , assertAll
@@ -54,6 +55,7 @@ import qualified Data.List as L
 import Data.Ord (comparing)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Network.URI (URI(..), URIAuth(..), parseURI, pathSegments)
 
 import Test.HUnit ((@?), assertFailure)
 
@@ -85,37 +87,77 @@ declAt pos = declsAt pos >>= \case
         , ":\n", prettyDecls ds
         ]
 
-docUriDecls :: T.Text -> ReaderT XRef IO [DocUriDecl]
-docUriDecls uri = do
+parsePathSegments :: URI -> Maybe (T.Text, T.Text)
+parsePathSegments uri =
+    case pathSegments uri of
+        ["package", pkg, "docs", "src", page] ->
+            Just (extractPkgName pkg, T.pack page)
+        _ -> Nothing
+  where
+    extractPkgName = head . T.splitOn "-" . T.pack
+
+isCorrectDocUri :: T.Text -> T.Text -> T.Text -> T.Text -> Bool
+isCorrectDocUri pkg page fragment actualURI =
+    case parseURI (T.unpack actualURI) of
+        Nothing -> error $ "Invalid URI: " ++ T.unpack actualURI
+        Just uri ->
+            case parsePathSegments uri of
+              Just (actualPkg, actualPage) ->
+                (uriRegName <$> uriAuthority uri) == Just "hackage.haskell.org"
+                    && actualPkg == pkg
+                    && actualPage == page
+                    && uriFragment uri == T.unpack fragment
+              Nothing -> error $ "Invalid Hackage URI: " ++ T.unpack actualURI
+
+docUriDecls :: T.Text -> T.Text -> T.Text -> ReaderT XRef IO [DocUriDecl]
+docUriDecls pkg page fragment = do
     decls <- asks xrefDocDecls
-    let filtered = filter ((== uri) . ddeclDocUri) decls
+    let filtered =
+            filter (isCorrectDocUri pkg page fragment . ddeclDocUri) decls
     liftIO $ not (null filtered) @? concat
-        [ "No declarations with doc/uri ", T.unpack uri]
+        [ "No declarations with doc/uri for "
+        , T.unpack pkg
+        , " / "
+        , T.unpack page
+        , "#"
+        , T.unpack fragment
+        ]
     return $! L.sortBy (comparing ddeclTick) filtered
 
-docUriDecl :: T.Text -> ReaderT XRef IO DocUriDecl
-docUriDecl uri = docUriDecls uri >>= \case
+docUriDecl :: T.Text -> T.Text -> T.Text -> ReaderT XRef IO DocUriDecl
+docUriDecl pkg page fragment = docUriDecls pkg page fragment >>= \case
     [] -> error "docUriDecls should have caught empty decls"
     [d] -> return d
     ds -> failConcat
-        [ "Multiple declarations with doc/uri ", T.unpack uri
+        [ "Multiple declarations with doc/uri for "
+        , T.unpack pkg
+        , " / "
+        , T.unpack page
+        , "#"
+        , T.unpack fragment
         , ":\n", prettyDocUriDecls ds
         ]
-
-moduleDocUriDecls :: T.Text -> ReaderT XRef IO [ModuleDocUriDecl]
-moduleDocUriDecls uri = do
+moduleDocUriDecls :: T.Text -> T.Text -> ReaderT XRef IO [ModuleDocUriDecl]
+moduleDocUriDecls pkg page = do
     decls <- asks xrefModuleDocDecls
-    let filtered = filter ((== uri) . mddeclDocUri) decls
+    let filtered = filter (isCorrectDocUri pkg page "" . mddeclDocUri) decls
     liftIO $ not (null filtered) @? concat
-        [ "No module declarations with doc/uri ", T.unpack uri]
+        [ "No module declarations with doc/uri for "
+        , T.unpack pkg
+        , " / "
+        , T.unpack page
+        ]
     return $! L.sortBy (comparing mddeclTick) filtered
 
-moduleDocUriDecl :: T.Text -> ReaderT XRef IO ModuleDocUriDecl
-moduleDocUriDecl uri = moduleDocUriDecls uri >>= \case
+moduleDocUriDecl :: T.Text -> T.Text -> ReaderT XRef IO ModuleDocUriDecl
+moduleDocUriDecl pkg page = moduleDocUriDecls pkg page >>= \case
     [] -> error "moduleDocUriDecls should have caught empty decls"
     [d] -> return d
     ds -> failConcat
-        [ "Multiple module declarations with doc/uri ", T.unpack uri
+        [ "Multiple module declarations with doc/uri for "
+        , T.unpack pkg
+        , " / "
+        , T.unpack page
         , ":\n", prettyModuleDocUriDecls ds
         ]
 

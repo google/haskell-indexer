@@ -42,10 +42,6 @@ matrix:
     compiler: ": #cabal new-build"
     addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
-  - env: BUILD=cabal-new-no-freeze GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #cabal new-build w/o freeze file"
-    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.5,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
-
 
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
@@ -57,6 +53,12 @@ matrix:
   # variable, such as using --stack-yaml to point to a different file.
   - env: STACK_YAML=stack-ghc865.yaml BUILD=stack
     compiler: ": #stack-ghc865.yaml"
+    addons: {apt: {packages: [libgmp-dev]}}
+
+  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
+  # variable, such as using --stack-yaml to point to a different file.
+  - env: STACK_YAML=stack-ghc-8.10.yaml BUILD=stack
+    compiler: ": #stack-ghc-8.10.yaml"
     addons: {apt: {packages: [libgmp-dev]}}
 
   # Nightly builds are allowed to fail
@@ -146,10 +148,6 @@ install:
 
       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
       ;;
-    cabal-new-no-freeze)
-      rm cabal.project.freeze
-      cabal_new
-      ;;
     cabal-new)
       cabal_new
       ;;
@@ -194,10 +192,6 @@ script:
         cabal test
         cd $ORIGDIR
       done
-      ;;
-    cabal-new-no-freeze)
-      test ! -f cabal.project.freeze
-      cabal_new
       ;;
     cabal-new)
       cabal_new

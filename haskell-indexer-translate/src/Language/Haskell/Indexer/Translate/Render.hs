@@ -16,6 +16,7 @@
    Frontends can use this module as a convenience, but it is not mandatory to
    stick to the formats if they don't want.
 -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module Language.Haskell.Indexer.Translate.Render
@@ -27,7 +28,9 @@ module Language.Haskell.Indexer.Translate.Render
 
 import Control.Applicative ((<|>))
 import Control.Monad (guard)
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
+#endif
 import Data.Text (Text)
 
 import Language.Haskell.Indexer.Translate

@@ -12,11 +12,13 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -45,7 +47,11 @@ import FastString (unpackFS)
 import FieldLabel (FieldLbl (..))
 import GHC
 import qualified Id as GHC
+#if MIN_VERSION_ghc(8,10,0)
+import qualified GHC.Hs as HsTypes
+#else
 import qualified HsTypes
+#endif
 import Module (unitIdString)
 import Name (nameModule_maybe, nameOccName)
 import qualified Outputable as GHC
@@ -61,13 +67,17 @@ import Data.Function (on)
 import Data.List (partition, sortBy, groupBy)
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
+#endif
 import Data.Ord (comparing)
 import Data.Reflection (Given, give, given)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+#if !MIN_VERSION_base(4,13,0)
 import GHC.Stack (HasCallStack) -- (From "base", not "ghc").
+#endif
 
 import Language.Haskell.Indexer.Backend.AnalysisOptions
 import Language.Haskell.Indexer.Backend.GhcEnv (GhcEnv(..))
@@ -210,14 +220,19 @@ hsTypeVarName :: HsType GhcRn -> Maybe (Located Name)
 hsTypeVarName (HsTyVar _ _ n) = Just $! n
 hsTypeVarName _ = Nothing
 
+#if !MIN_VERSION_ghc(8,8,0)
 -- Stand-in for 'noExtCon' of the empty data type 'NoExtCon' in GHC 8.8+, which
 -- replaces 'NoExt' in extension point constructors to make them
 -- unconstructable rather than trivial to construct, with a useless value.
---
--- When migrating to newer GHC, just delete this stand-in and import the
--- newly-added one, and all should be well.
 noExtCon :: HasCallStack => NoExt -> a
 noExtCon NoExt = error "noExtCon: this was meant to be inaccessible."
+
+-- Stand-in for 'NoExtField' in GHC 8.8+, which replaces 'NoExt' in extension
+-- point placeholders.
+{-# COMPLETE NoExtField #-}
+pattern NoExtField :: NoExt
+pattern NoExtField = NoExt
+#endif
 
 -- | Extracts:
 --   * datatypes, constructors, type variable bindings.
@@ -277,7 +292,11 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         fromLoc (L l n) = (n, l)
     -- | Monomorphising type so uniplate is happier.
     namesFromHsIbSig :: HsTypes.LHsSigType GhcRn -> [Name]
+#if MIN_VERSION_ghc(8,8,0)
+    namesFromHsIbSig = HsTypes.hsib_ext
+#else
     namesFromHsIbSig = hsib_vars . HsTypes.hsib_ext
+#endif
 
     namesFromHsWC :: HsTypes.LHsWcType GhcRn -> [Name]
     namesFromHsWC = HsTypes.hswc_ext
@@ -289,7 +308,11 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
         HsTypes.hswc_ext
     --
     namesFromForall :: HsType GhcRn -> [Name]
+#if MIN_VERSION_ghc(8,10,0)
+    namesFromForall (HsForAllTy _ _ binders _) = map hsLTyVarName binders
+#else
     namesFromForall (HsForAllTy _ binders _) = map hsLTyVarName binders
+#endif
     namesFromForall _ = []
     -- | For typevar binders directly attached to datatype declarations (like
     -- data, type, class etc), the location of the name is correctly set to
@@ -351,7 +374,7 @@ declsFromRenamed ctx (hsGroup, _, _, _) =
     -- These appear both in top-level decls and in class decls.
     famDecls :: FamilyDecl GhcRn -> [DeclAndAlt]
     famDecls (XFamilyDecl no) = noExtCon no
-    famDecls (FamilyDecl NoExt _ locName binders _ _resSig _) =
+    famDecls (FamilyDecl NoExtField _ locName binders _ _resSig _) =
         famDecl : tyvars
       where
         -- TODO _resSig is the kind information that tyConLikeDecl is omitting.
@@ -431,7 +454,11 @@ data SplitInstType = SplitInstType
 
 mySplitInstanceType :: HsTypes.LHsSigType GhcRn -> Maybe SplitInstType
 mySplitInstanceType ty = do
+#if MIN_VERSION_ghc(8,10,0)
+    let (_, body) = HsTypes.splitLHsForAllTyInvis (HsTypes.hsSigType ty)
+#else
     let (_, body) = HsTypes.splitLHsForAllTy (HsTypes.hsSigType ty)
+#endif
     clsName <- HsTypes.getLHsInstDeclClass_maybe ty
     Just $! SplitInstType
         { onlyClass = unLoc clsName
@@ -482,15 +509,15 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
   where
     -- References from family instances to their family.
     tyInstRefs :: InstDecl GhcRn -> [Reference]
-    tyInstRefs (TyFamInstD NoExt (TyFamInstDecl decl)) = ibFamEqnRefs decl
-    tyInstRefs (DataFamInstD NoExt (DataFamInstDecl decl)) = ibFamEqnRefs decl
-    tyInstRefs (ClsInstD NoExt decl) = clsInstRefs decl
+    tyInstRefs (TyFamInstD NoExtField (TyFamInstDecl decl)) = ibFamEqnRefs decl
+    tyInstRefs (DataFamInstD NoExtField (DataFamInstDecl decl)) = ibFamEqnRefs decl
+    tyInstRefs (ClsInstD NoExtField decl) = clsInstRefs decl
     tyInstRefs (XInstDecl no) = noExtCon no
 
     -- References from closed family bodies to their enclosing family.
     tyClDeclRefs :: TyClDecl GhcRn -> [Reference]
-    tyClDeclRefs (FamDecl NoExt fam) = case fam of
-      FamilyDecl NoExt info _ _ _ _ _ -> case info of
+    tyClDeclRefs (FamDecl NoExtField fam) = case fam of
+      FamilyDecl NoExtField info _ _ _ _ _ -> case info of
         ClosedTypeFamily (Just insts) ->
           concatMap (famEqnRefs . hsib_body . unLoc) insts
         _ -> []
@@ -499,17 +526,22 @@ refsFromRenamed ctx declAlts (hsGroup, importDecls, exports, _) =
 
     -- References from associated family instances to their family.
     clsInstRefs :: ClsInstDecl GhcRn -> [Reference]
-    clsInstRefs (ClsInstDecl NoExt _ _ _ tyInsts dataInsts _) =
+    clsInstRefs (ClsInstDecl NoExtField _ _ _ tyInsts dataInsts _) =
       concatMap (ibFamEqnRefs . tfid_eqn . unLoc) tyInsts ++
       concatMap (ibFamEqnRefs . dfid_eqn . unLoc) dataInsts
     clsInstRefs (XClsInstDecl no) = noExtCon no
 
     ibFamEqnRefs :: FamInstEqn GhcRn a -> [Reference]
-    ibFamEqnRefs (HsIB (HsIBRn _vars _closed) eqn) = famEqnRefs eqn
+    ibFamEqnRefs (HsIB _ eqn) = famEqnRefs eqn
     ibFamEqnRefs (XHsImplicitBndrs no) = noExtCon no
 
+#if MIN_VERSION_ghc(8,10,0)
+    famEqnRefs :: FamEqn GhcRn a -> [Reference]
+    famEqnRefs (FamEqn NoExtField (L loc tycon) _ _ _ _) =
+#else
     famEqnRefs :: FamEqn GhcRn a b -> [Reference]
-    famEqnRefs (FamEqn NoExt (L loc tycon) _ _ _) =
+    famEqnRefs (FamEqn NoExtField (L loc tycon) _ _ _) =
+#endif
         maybeToList $ give ctx $ nameLocToRef tycon Ref loc
     famEqnRefs (XFamEqn no) = noExtCon no
 
@@ -868,7 +900,7 @@ typeStringyType = StringyType
 -- | Creates a Decl from a tick, by default taking id-span and identifier from
 -- the tick.
 tickDecl :: ExtractCtx -> StringyType -> Tick -> Decl
-tickDecl (ExtractCtx _ _ GhcEnv{..} _) stype t = Decl
+tickDecl (ExtractCtx _ _ GhcEnv{} _) stype t = Decl
     { declTick = t
     , declIdentifierSpan = tickSpan t
     , declType = stype
@@ -1160,7 +1192,11 @@ categorizedRecordFields
     :: HsRecFields id arg
     -> [(RecFieldCat, HsRecField id arg)]
 categorizedRecordFields recFields = do
+#if MIN_VERSION_ghc(8,10,0)
+    let explicitCount = unLoc <$> rec_dotdot recFields
+#else
     let explicitCount = rec_dotdot recFields
+#endif
     (i, field) <- [0..] `zip` (unLoc <$> rec_flds recFields)
     let cat = if hsRecPun field
           then PunnedRF

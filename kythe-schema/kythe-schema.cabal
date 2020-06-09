@@ -23,7 +23,7 @@ library
                      , data-default
                      , kythe-proto
                      , lens-family
-                     , proto-lens >= 0.5 && < 0.6
+                     , proto-lens >= 0.7 && < 0.8
                      , text
   ghc-options:         -Wall
                        -Wcompat
