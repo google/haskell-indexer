@@ -79,11 +79,8 @@ jobs:
         with:
           enable-stack: true
 
-      - name: Configure Cabal
-        run: cabal configure --enable-tests --enable-benchmarks
-
       - name: Build
-        run: cabal build all
+        run: stack build --test --bench --no-run-tests --no-run-benchmarks
 
       - name: Test
-        run: cabal test all
+        run: stack build --test --bench --no-run-benchmarks
