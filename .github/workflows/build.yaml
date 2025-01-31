@@ -1,0 +1,45 @@
+name: Build
+permissions: read-all
+
+on:
+  push:
+    branches:
+      - 'master'
+
+    pull_request:
+      paths:
+        - '**.hs'
+        - 'stack*.yaml'
+        - '.github/workflows/build.yaml'
+
+jobs:
+  cabal:
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-latest"
+
+        ghc:
+          - "8.6.5"
+          - "8.10"
+
+    name: cabal / ${{ matrix.os }} / ghc ${{ matrix.ghc }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Haskell
+        uses: haskell-actions/setup@bbd90a29996ac33b1c644a42206e312fc0379748 # v2.7.9
+        with:
+          ghc-version: ${{ matrix.ghc }}
+
+      - name: Configure Cabal
+        run: cabal configure --enable-tests --enable-benchmarks
+
+      - name: Build
+        run: cabal build
+
+      - name: Test
+        run: cabal test
