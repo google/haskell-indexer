@@ -1,0 +1,60 @@
+name: Build
+permissions: read-all
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'workflow'
+      - 'main'
+
+  pull_request:
+    paths:
+      - '**.hs'
+      - '**.cabal'
+      - 'stack*.yaml'
+      - '.github/workflows/build.yaml'
+
+jobs:
+  cabal:
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-latest"
+
+        ghc:
+          - "8.10.7"
+
+    name: cabal / ${{ matrix.os }} / ghc ${{ matrix.ghc }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Cache dependencies
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: |
+            /usr/local/.ghcup
+            ~/.ghcup
+            ~/.cabal
+          key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-hashFiles('**.cabal')
+          restore-keys: cabal-${{ matrix.os }}-${{ matrix.ghc }}-
+
+      - name: Set up protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+
+      - name: Set up Haskell
+        uses: haskell-actions/setup@bbd90a29996ac33b1c644a42206e312fc0379748 # v2.7.9
+        with:
+          ghc-version: ${{ matrix.ghc }}
+
+      - name: Configure Cabal
+        run: cabal configure --enable-tests --enable-benchmarks
+
+      - name: Build
+        run: cabal build all
+
+      - name: Test
+        run: cabal test all
