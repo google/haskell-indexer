@@ -34,9 +34,8 @@ jobs:
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: |
-            /usr/local/.ghcup
-            ~/.ghcup
             ~/.cabal
+            ~/.ghcup
           key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('*/*.cabal') }}
 
       - name: Set up protoc
