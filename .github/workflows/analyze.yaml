@@ -8,6 +8,8 @@ on:
   pull_request:
     paths:
       - '**.hs'
+      - '.hlint.yaml'
+      - '.github/workflows/hlint.yaml'
 
 jobs:
   hlint:
