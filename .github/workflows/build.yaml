@@ -69,7 +69,7 @@ jobs:
           path: |
             ~/.ghcup
             ~/.stack
-          key: stack-${{ hashFiles('**.cabal') }}
+          key: stack-${{ hashFiles('stack.yaml', '*/*.cabal') }}
 
       - name: Set up protoc
         uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
