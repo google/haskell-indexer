@@ -10,3 +10,7 @@ pattern BiSingle a = [a]
 biAsExpr x = BiSingle x
 
 biAsPattern (BiSingle x) = x
+
+pattern BiRec { recField } = [recField]
+
+biRecAsExpr x = BiRec { recField = x }

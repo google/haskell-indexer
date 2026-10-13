@@ -43,7 +43,7 @@ import qualified BasicTypes as GHC
 import qualified ConLike
 import qualified DataCon as GHC
 import qualified Name as GHC
-import FastString (unpackFS)
+import FastString (FastString, unpackFS)
 import FieldLabel (FieldLbl (..))
 import GHC
 import qualified Id as GHC
@@ -656,11 +656,13 @@ importsFromRenamed ctx (_, lImportDecls, _, _) =
         -- module declaration), which is surprising to users.
       | ideclImplicit implDecl = return Nothing
       | otherwise = do
-          pkgModule <- extractPkgModule . unLoc . ideclName $ implDecl
+          let pkgQual = GHC.sl_fs <$> ideclPkgQual implDecl
+          pkgModule <- extractPkgModule pkgQual . unLoc . ideclName $ implDecl
           let pkgSpan = give ctx (srcSpanToSpan . getLoc $ ideclName implDecl)
           return $ Just $ ModuleTick pkgModule pkgSpan
-    extractPkgModule :: GhcMonad m => ModuleName -> m PkgModule
-    extractPkgModule name = findModule name Nothing >>= return . extractModuleName ctx
+    extractPkgModule :: GhcMonad m => Maybe FastString -> ModuleName -> m PkgModule
+    extractPkgModule pkgQual name =
+        extractModuleName ctx <$> findModule name pkgQual
 
 
 -- | Fabricates an instance method tick based on RenamedSource data. The
@@ -1084,29 +1086,29 @@ refsFromTypechecked ctx tsrc declAlts =
             -- From GHC 8.2.1, ctor reference is not just a simple HsVar.
             let name = ConLike.conLikeName conLike
             in maybeToList (give ctx (nameLocToRef name Ref l))
-        RecordCon _ locDataConId r -> recordConRefs locDataConId r
+        RecordCon RecordConTc { rcon_con_like = conLike } (L ctorLoc _) r ->
+            recordConRefs conLike ctorLoc r
         -- TODO(robinp): emit ref to all the possible constructors (also below).
-        RecordUpd (RecordUpdTc (ConLike.RealDataCon dc:_) _ _ _) _ r ->
-            recordUpdRefs dc r
+        RecordUpd (RecordUpdTc (conLike:_) _ _ _) _ r ->
+            recordUpdRefs conLike r
         -- Others handled by universe.
         _ -> []
       where
-        recordConRefs (L ctorLoc conId) r =
-            let dataCon = GHC.idDataCon conId
-                ctorRef = give ctx (
-                              nameLocToRef (GHC.dataConName dataCon) Ref ctorLoc)
-                fieldNames = GHC.dataConFieldLabels dataCon
+        recordConRefs conLike ctorLoc r =
+            let ctorRef = give ctx (
+                              nameLocToRef (ConLike.conLikeName conLike) Ref ctorLoc)
+                fieldNames = ConLike.conLikeFieldLabels conLike
                 fieldRefs = concatMap (recordFieldRefs fieldNames)
                           . categorizedRecordFields
                           $ r
             in maybeToList ctorRef ++ fieldRefs
-        -- | DataCon is any datacon that has all fields that are updated.
-        -- The same-named fields of different datacons are actually just a
-        -- single field, so it's ok to pass in an arbitrary DataCon to mine
-        -- for reference targets.
-        recordUpdRefs :: DataCon -> [LHsRecUpdField GhcTc] -> [Reference]
-        recordUpdRefs dataCon =
-            let fieldNames = GHC.dataConFieldLabels dataCon
+        -- | ConLike is any datacon or pattern synonym that has all fields that
+        -- are updated. The same-named fields of different datacons are actually
+        -- just a single field, so it's ok to pass in an arbitrary ConLike to
+        -- mine for reference targets.
+        recordUpdRefs :: ConLike.ConLike -> [LHsRecUpdField GhcTc] -> [Reference]
+        recordUpdRefs conLike =
+            let fieldNames = ConLike.conLikeFieldLabels conLike
             in concatMap (recordFieldRefs fieldNames)
                 . map (
                       (ExplicitAssignedRF,)

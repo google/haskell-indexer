@@ -329,8 +329,9 @@ testUtf8 = assertXRefsFrom ["basic/Utf8.hs"] $
 -- | Test that the module imports are emitted.
 testImports :: AssertionInEnv
 testImports = assertXRefsFrom ["basic/Imports.hs"] $ do
-    importAt (3, 8) "Data.Int"
-    importAt (4, 8) "Data.List"
+    importAt (4, 8) "Data.Int"
+    importAt (5, 8) "Data.List"
+    importAt (6, 15) "Data.Maybe"
 
 assertRefKind :: ReferenceKind -> TickReference -> ReaderT XRef IO ()
 assertRefKind expected tick =
@@ -433,6 +434,8 @@ testPatternSynonyms = assertXRefsFrom ["basic/PatSyn.hs"] $ do
         includesPos (12, 14) u2
       us -> checking $
         assertFailure $ "Usage count differs for BiSingle: " ++ show us
+    declAt (14, 9) >>= singleUsage >>= includesPos (16, 17)
+    declAt (14, 17) >>= singleUsage >>= includesPos (16, 25)
 
 testTypeOperators :: AssertionInEnv
 testTypeOperators = assertXRefsFrom ["basic/TypeOperators.hs"] $ do
