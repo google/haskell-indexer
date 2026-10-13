@@ -15,3 +15,9 @@ biAsExpr x = BiSingle x
 
 -- - @BiSingle ref PatBiSingle
 biAsPattern (BiSingle x) = x
+
+-- - @BiRec defines/binding PatBiRec
+pattern BiRec { recField } = [recField]
+
+-- - @BiRec ref PatBiRec
+biRecAsExpr x = BiRec { recField = x }
